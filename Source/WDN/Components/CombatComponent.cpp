@@ -164,6 +164,21 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	bIsWeaponEquipped = true;
 }
 
+void UCombatComponent::OnRep_EquippedWeapon()
+{
+	if (EquippedWeapon && WdnCharacter)
+	{
+		EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+		const USkeletalMeshSocket* HandSocket = WdnCharacter->GetMesh()->GetSocketByName(FName("RightHandSocket"));
+		if (HandSocket)
+		{
+			HandSocket->AttachActor(EquippedWeapon, WdnCharacter->GetMesh());
+		}
+		WdnCharacter->GetCharacterMovement()->bOrientRotationToMovement = false;
+		WdnCharacter->bUseControllerRotationYaw = true;
+	}
+}
+
 bool UCombatComponent::IsWeaponEquipped() const
 {
 	return bIsWeaponEquipped;

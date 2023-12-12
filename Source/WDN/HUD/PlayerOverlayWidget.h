@@ -6,6 +6,9 @@
 #include "Blueprint/UserWidget.h"
 #include "PlayerOverlayWidget.generated.h"
 
+
+class UProgressBar;
+class UTextBlock;
 /**
  * 
  */
@@ -17,7 +20,12 @@ class WDN_API UPlayerOverlayWidget : public UUserWidget
 public:
 	
 	UPROPERTY(meta = (BindWidget))
-	class UProgressBar* HealthBar;
+	UProgressBar* HealthBar;
 	UPROPERTY(meta = (BindWidget))
-	class UTextBlock* HealthText;
+	UTextBlock* HealthText;
+
+	UPROPERTY(meta = (BindWidget))
+	UTextBlock* ScoreAmount;
+	UPROPERTY(meta = (BindWidget))
+	UTextBlock* DefeatsAmount;
 };

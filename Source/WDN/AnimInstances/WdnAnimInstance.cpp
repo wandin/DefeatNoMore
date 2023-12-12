@@ -34,6 +34,7 @@ void UWdnAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	TurnInPlace = WdnCharacter->GetTurnInPlace();
 	bIsFiring = WdnCharacter->GetIsFiring();
 	bRotateRootBone = WdnCharacter->ShouldRotateRootBone();
+	bEliminated = WdnCharacter->IsEliminated();
 
 	//Offsets
 	const FRotator AimRotation = WdnCharacter->GetBaseAimRotation();
@@ -61,7 +62,7 @@ void UWdnAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		{
 			bLocallyControlled = true;
 			const FTransform RightHandTransform = WdnCharacter->GetMesh()->GetSocketTransform(FName("hand_r"), RTS_World);
-			FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(RightHandTransform.GetLocation(), RightHandTransform.GetLocation() + (RightHandTransform.GetLocation() - WdnCharacter->GetHitTarget()));
+			const FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(RightHandTransform.GetLocation(), RightHandTransform.GetLocation() + (RightHandTransform.GetLocation() - WdnCharacter->GetHitTarget()));
 			
 			RightHandRotation = FMath::RInterpTo(RightHandRotation,LookAtRotation, DeltaSeconds, 13.5f);
 		}

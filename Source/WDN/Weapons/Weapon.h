@@ -37,6 +37,8 @@ public:
 
 	// we are overriding Fire in ProjectileWeapon
 	virtual void Fire(const FVector& HitTarget);
+
+	void DropWeapon();
 	
 protected:
 	virtual void BeginPlay() override;

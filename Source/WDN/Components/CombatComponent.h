@@ -56,6 +56,9 @@ protected:
 	void TraceUnderCrosshairs(FHitResult& TraceHitResult);
 
 	void SetHUDCrosshairs(float DeltaSeconds);
+
+	UFUNCTION()
+	void OnRep_EquippedWeapon();
 	
 private:
 
@@ -66,7 +69,7 @@ private:
 	UPROPERTY()
 	AWDNHUD* HUD;
 	
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
 	AWeapon* EquippedWeapon;
 
 	bool bIsWeaponEquipped;

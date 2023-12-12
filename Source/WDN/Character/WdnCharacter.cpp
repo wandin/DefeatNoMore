@@ -1,23 +1,21 @@
 #include "WdnCharacter.h"
 
-#include <Windows/DirectX/include/d3d12sdklayers.h>
-
 #include "EnhancedInputSubsystems.h"
-#include "EnhancedInputComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
+#include "WDN/PlayerState/WDNPlayerState.h"
 #include "WDN/Components/CombatComponent.h"
 #include "WDN/Weapons/Weapon.h"
 #include "WDN/WDN.h"
+#include "WDN/GameModes/WdnGameMode.h"
 #include "WDN/PlayerController/WDNPlayerController.h"
 
 AWdnCharacter::AWdnCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("Spring Arm"));
 	SpringArm->SetupAttachment(GetMesh(), FName("head"));
 	const FVector SpringArmLocation(5.f, 18.f, 0.f);
@@ -45,6 +43,8 @@ AWdnCharacter::AWdnCharacter()
 	
 	NetUpdateFrequency = 128.f;
 	MinNetUpdateFrequency = 64.f;
+
+	DissolveTimeLine = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimeLineComponent"));
 }
 
 void AWdnCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -69,29 +69,24 @@ void AWdnCharacter::PostInitializeComponents()
 void AWdnCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	WdnPlayerController = Cast<AWDNPlayerController>(Controller);
-	if(WdnPlayerController)
-	{
-		if(UEnhancedInputLocalPlayerSubsystem* EIP  = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(WdnPlayerController->GetLocalPlayer()))
-		{
-			EIP->AddMappingContext(DefaultMappingContext, 0);
-		}
-		EnableInput(WdnPlayerController);
 		
-		WdnPlayerController->UpdatePlayerHealth(Health, MaxHealth);
-	}
+	UpdateHUDHealth();
 	if(HasAuthority())
 	{
 		OnTakeAnyDamage.AddDynamic(this, &AWdnCharacter::ReceiveDamage);
 	}
-	UpdateHUDHealth();
 }
 
 void AWdnCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	/* I commented it out but don't recall the whole thing exactly -.-, will come back to this later
+	 * better keep it, it relates to the character turninPlace animations, to be fixed
+	 * it works better WITHOUT this extra logic around, but not perfect as I want.
+	 * we must go with procedural animations - WdN
+	 */
+	
 	// if(GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled()) // same as IsLocallyControlled
 	// {
 	// 	AimOffset(DeltaSeconds);
@@ -108,57 +103,7 @@ void AWdnCharacter::Tick(float DeltaSeconds)
 	// 	CalculateAO_Pitch();
 	// }
 	AimOffset(DeltaSeconds);
-}
-
-void AWdnCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	if(UEnhancedInputComponent* EIC = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
-	{
-		//Jump
-		EIC->BindAction(JumpAction, ETriggerEvent::Triggered, this, &AWdnCharacter::Jump);
-		EIC->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
-		//Move
-		EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AWdnCharacter::Move);
-		// Walk (not running / no footstep sounds)
-		EIC->BindAction(WalkAction, ETriggerEvent::Triggered, this, &AWdnCharacter::WalkPressed);
-		EIC->BindAction(WalkAction, ETriggerEvent::Completed, this, &AWdnCharacter::WalkReleased);
-		//Look
-		EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &AWdnCharacter::Look);
-		//Crouch
-		EIC->BindAction(CrouchAction, ETriggerEvent::Started, this, &AWdnCharacter::CrouchPressed);
-		// Aim - ZoomFOV
-		EIC->BindAction(AimAction, ETriggerEvent::Triggered, this, &AWdnCharacter::AimButtonPressed);
-		EIC->BindAction(AimAction, ETriggerEvent::Completed, this, &AWdnCharacter::AimButtonReleased);
-		//Fire
-		EIC->BindAction(FireAction, ETriggerEvent::Triggered, this, &AWdnCharacter::FireButtonPressed);
-		EIC->BindAction(FireAction, ETriggerEvent::Completed, this, &AWdnCharacter::FireButtonReleased);
-	}
-}
-
-void AWdnCharacter::Move(const FInputActionValue& Value)
-{
-	// AddMovementInput takes a Vector
-	const FVector2d MovementVector = Value.Get<FVector2d>();
-	if(IsValid(Controller))
-	{
-		AddMovementInput(GetActorForwardVector(), MovementVector.Y);
-		AddMovementInput(GetActorRightVector(), MovementVector.X);
-	}
-}
-
-void AWdnCharacter::Look(const FInputActionValue& Value)
-{
-	// AddControllerPitchInput takes a Vector
-	const FVector2d LookAxisVector = Value.Get<FVector2d>();
-	float Pitch = LookAxisVector.Y;
-	if(IsValid(Controller))
-	{
-		APlayerController* PC = Cast<APlayerController>(GetController());
-		PC->AddPitchInput(LookAxisVector.Y);
-		AddControllerYawInput(LookAxisVector.X);
-	}
+	PollInit();
 }
 
 void AWdnCharacter::Jump()
@@ -170,47 +115,6 @@ void AWdnCharacter::Jump()
 	Super::Jump();
 }
 
-void AWdnCharacter::CrouchPressed()
-{
-	if(bIsCrouched)
-	{
-		UnCrouch();
-	}
-	Crouch();
-}
-
-void AWdnCharacter::WalkPressed()
-{
-	if(IsLocallyControlled())
-	{
-		ServerWalkPressed();
-	}
-	bWalking = true;
-	GetCharacterMovement()->MaxWalkSpeed = 220.f;
-}
-
-void AWdnCharacter::WalkReleased()
-{
-	if(IsLocallyControlled())
-	{
-		ServerWalkReleased();
-	}
-	bWalking = false;
-	GetCharacterMovement()->MaxWalkSpeed = 420.f;
-}
-
-void AWdnCharacter::ServerWalkPressed_Implementation()
-{
-	bWalking = true;
-	GetCharacterMovement()->MaxWalkSpeed = 220.f;
-}
-
-void AWdnCharacter::ServerWalkReleased_Implementation()
-{
-	bWalking = false;
-	GetCharacterMovement()->MaxWalkSpeed = 420.f;
-}
-
 float AWdnCharacter::CalculateSpeed() const
 {
 	FVector Velocity = GetVelocity();
@@ -220,6 +124,8 @@ float AWdnCharacter::CalculateSpeed() const
 
 void AWdnCharacter::OnRep_Health()
 {
+	UpdateHUDHealth();
+	PlayHitReactMontage();
 }
 
 void AWdnCharacter::AimOffset(float DeltaSeconds)
@@ -391,7 +297,7 @@ void AWdnCharacter::AimButtonReleased()
 	}
 }
 
-bool AWdnCharacter::bIsAiming()
+bool AWdnCharacter::bIsAiming() const
 {
 	return (CombatComp && CombatComp->bAiming);	
 }
@@ -430,7 +336,10 @@ void AWdnCharacter::PlayHitReactMontage()
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if(AnimInstance && HitReactMontage)
 	{
-		AnimInstance->Montage_Play(HitReactMontage);
+		if(!IsLocallyControlled())
+		{
+			AnimInstance->Montage_Play(HitReactMontage);
+		}
 	}
 }
 
@@ -440,6 +349,89 @@ void AWdnCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const UDam
 	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
 	UpdateHUDHealth();
 	PlayHitReactMontage();
+
+	if(Health == 0.f)
+	{
+		AWdnGameMode* WdnGameMode = GetWorld()->GetAuthGameMode<AWdnGameMode>();
+		if(WdnGameMode)
+		{
+			WdnPlayerController = WdnPlayerController == nullptr ? Cast<AWDNPlayerController>(Controller) : WdnPlayerController;
+			AWDNPlayerController* AttackerController = Cast<AWDNPlayerController>(InstigatorController);
+			WdnGameMode->PlayerEliminated(this, WdnPlayerController, AttackerController);
+		}
+	}
+}
+
+void AWdnCharacter::Elimination()
+{
+	if(CombatComp && CombatComp->EquippedWeapon)
+	{
+		CombatComp->EquippedWeapon->DropWeapon();
+	}
+	if(HasAuthority())
+	{
+		MulticastElimination();
+	}
+	MulticastElimination();
+	GetWorldTimerManager().SetTimer(EliminationTimer, this, &AWdnCharacter::EliminationTimerFinished, EliminationDelay);
+}
+
+void AWdnCharacter::MulticastElimination_Implementation()
+{
+	bEliminated = true;
+	PlayEliminationMontage();
+	if(DissolveMaterialInstance)
+	{
+		DynamicDissolveMaterialInstance = UMaterialInstanceDynamic::Create(DissolveMaterialInstance, this);
+		GetMesh()->SetMaterial(0, DynamicDissolveMaterialInstance);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Dissolve"), 0.55f);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Glow"), 200.f);
+	}
+	StartDissolve();
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
+	if(WdnPlayerController)
+	{
+		DisableInput(WdnPlayerController);
+	}
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+void AWdnCharacter::PlayEliminationMontage()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if(AnimInstance && DeathMontage)
+	{
+		AnimInstance->Montage_Play(DeathMontage);
+	}
+}
+
+void AWdnCharacter::EliminationTimerFinished()
+{
+	AWdnGameMode* WdnGameMode = GetWorld()->GetAuthGameMode<AWdnGameMode>();
+	if(WdnGameMode)
+	{
+		WdnGameMode->RequestRespawn(this, Controller);
+	}
+}
+
+void AWdnCharacter::UpdateDissolveMaterial(float DissolveValue)
+{
+	if(DynamicDissolveMaterialInstance)
+	{
+		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Dissolve"), DissolveValue);
+	}
+}
+
+void AWdnCharacter::StartDissolve()
+{
+	DissolveTrack.BindDynamic(this, &AWdnCharacter::UpdateDissolveMaterial);
+	if(DissolveCurve && DissolveTimeLine)
+	{
+		DissolveTimeLine->AddInterpFloat(DissolveCurve, DissolveTrack);
+		DissolveTimeLine->Play();
+	}
 }
 
 void AWdnCharacter::UpdateHUDHealth()
@@ -448,6 +440,19 @@ void AWdnCharacter::UpdateHUDHealth()
 	if(WdnPlayerController)
 	{
 		WdnPlayerController->UpdatePlayerHealth(Health, MaxHealth);
+	}
+}
+
+void AWdnCharacter::PollInit()
+{
+	if (WDNPlayerState == nullptr)
+	{
+		WDNPlayerState = GetPlayerState<AWDNPlayerState>();
+		if (WDNPlayerState)
+		{
+			WDNPlayerState->AddToScore(0.f);
+			WDNPlayerState->AddToDefeats(0);
+		}
 	}
 }
 

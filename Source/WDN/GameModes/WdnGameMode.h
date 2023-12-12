@@ -13,5 +13,9 @@ UCLASS()
 class WDN_API AWdnGameMode : public AGameMode
 {
 	GENERATED_BODY()
-	
+
+public:
+
+	virtual void PlayerEliminated(class AWdnCharacter* ElimmedCharacter, class AWDNPlayerController* VictimController, AWDNPlayerController* AttackerController);
+	virtual void RequestRespawn(ACharacter* ElimmedCharacter, AController* ElimmedController);
 };
