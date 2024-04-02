@@ -1,9 +1,12 @@
-Binaries
-DerivedDataCache
-Intermediate
-Saved
-Build
+Binaries/
+Build/
+DerivedDataCache/
+Intermediate/
+Platforms/
+Saved/
 
+
+.idea/
 .vscode
 .vs
 *.VC.db
