@@ -38,13 +38,13 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	virtual void OnRep_Owner() override;
+	void SetHUDAmmo();
+	
 	// we are overriding Fire in ProjectileWeapon
 	virtual void Fire(const FVector& HitTarget);
-
 	void DropWeapon();
-	virtual void OnRep_Owner() override;
-
-	void SetHUDAmmo();
+	void AddAmmo(int32 AmmoToAdd);
 	
 protected:
 	virtual void BeginPlay() override;
@@ -103,6 +103,10 @@ private:
 	UPROPERTY(EditAnywhere)
 	EWeaponType WeaponType;
 public:
+
+	UPROPERTY(EditAnywhere)
+	class USoundCue* EquipSound;
+	
 	/*
 	 * Textures for the weapon crosshairs
 	 */
@@ -130,6 +134,8 @@ public:
 	FORCEINLINE float GetZoomedFOV() const { return ZoomedFOV; }
 	FORCEINLINE float GetZoomInterpSpeed() const { return ZoomInterpSpeed; }
 	FORCEINLINE EWeaponType GetWeaponType() const { return WeaponType; }
+	FORCEINLINE int32 GetAmmo() const { return Ammo; };
+	FORCEINLINE int32 GetMagCapacity() const { return MagCapacity; }
 	
 	bool IsEmpty() const;
 };

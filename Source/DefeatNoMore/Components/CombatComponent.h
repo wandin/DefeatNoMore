@@ -6,9 +6,13 @@
 #include "Components/ActorComponent.h"
 #include "DefeatNoMore/HUD/DFNHUD.h"
 #include "DefeatNoMore/Enums/WeaponTypes.h"
+#include "DefeatNoMore/Enums/CombatState.h"
+
+
 #include "CombatComponent.generated.h"
 
-#define TRACE_LENGTH 30000.f // define our trace length
+
+#define TRACE_LENGTH 80000.f // define our trace length
 
 class ADFNCharacter;
 class ADFNPlayerController;
@@ -29,6 +33,8 @@ public:
 	void EquipWeapon(AWeapon* WeaponToEquip);
 
 	void Reload();
+	UFUNCTION(BlueprintCallable)
+	void FinishReloading();
 protected:
 	virtual void BeginPlay() override;
 
@@ -61,6 +67,10 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerReload();
+
+	void HandleReload();
+
+	int32 AmountToReload();
 	
 	UFUNCTION()
 	void OnRep_EquippedWeapon();
@@ -133,7 +143,7 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_CarriedAmmo)
 	int32 CarriedAmmo;
-
+	
 	UFUNCTION()
 	void OnRep_CarriedAmmo();
 
@@ -143,4 +153,12 @@ private:
 	int32 StartingAmmoAR = 30;
 	
 	void InitializeCarriedAmmo();
+
+	UPROPERTY(ReplicatedUsing = OnRep_CombatState)
+	ECombatState CombatState = ECombatState::ECS_Unoccupied;
+
+	UFUNCTION()
+	void OnRep_CombatState();
+
+	void UpdateAmmoValues();
 };

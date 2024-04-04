@@ -69,5 +69,7 @@ void UDFNAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			RightHandRotation = FMath::RInterpTo(RightHandRotation,LookAtRotation, DeltaSeconds, 13.5f);
 		}
 	}
+	bUseFrabrik = DFNCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bUseAimOffsets = DFNCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bTransformRightHand = DFNCharacter->GetCombatState() != ECombatState::ECS_Reloading;
 }
-

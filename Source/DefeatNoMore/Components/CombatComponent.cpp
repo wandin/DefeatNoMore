@@ -16,6 +16,8 @@
 
 #include "DefeatNoMore/Enums/WeaponTypes.h"
 
+#include "Sound/SoundCue.h"
+
 UCombatComponent::UCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -29,9 +31,9 @@ void UCombatComponent::BeginPlay()
 	{
 		DFNCharacter->GetCharacterMovement()->MaxWalkSpeed = BaseWalkSpeed;
 
-		if(DFNCharacter->GetFirstPersonCamera())
+		if(DFNCharacter->GetThirdPersonCamera())
 		{
-			DefaultFOV = DFNCharacter->GetFirstPersonCamera()->FieldOfView;
+			DefaultFOV = DFNCharacter->GetThirdPersonCamera()->FieldOfView;
 			CurrentFOV = DefaultFOV;
 		}
 		if(DFNCharacter->HasAuthority())
@@ -49,6 +51,8 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(UCombatComponent, bAiming);
 	DOREPLIFETIME(UCombatComponent, bFiring);
 	DOREPLIFETIME_CONDITION(UCombatComponent, CarriedAmmo, COND_OwnerOnly);
+	DOREPLIFETIME(UCombatComponent, CombatState);
+
 }
 
 void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -186,21 +190,16 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	{
 		Controller->UpdateHUDCarriedAmmo(CarriedAmmo);
 	}
-}
 
-void UCombatComponent::Reload()
-{
-	//play reload animation
-	if(CarriedAmmo > 0)
+	if(EquippedWeapon->EquipSound)
 	{
-		ServerReload();
+		UGameplayStatics::PlaySoundAtLocation(this, EquippedWeapon->EquipSound, DFNCharacter->GetActorLocation());
 	}
-}
 
-void UCombatComponent::ServerReload_Implementation()
-{
-	if(DFNCharacter == nullptr) return;
-	DFNCharacter->PlayReloadMontage();
+	if(EquippedWeapon->IsEmpty())
+	{
+		Reload();
+	}
 }
 
 void UCombatComponent::OnRep_EquippedWeapon()
@@ -215,6 +214,11 @@ void UCombatComponent::OnRep_EquippedWeapon()
 		}
 		DFNCharacter->GetCharacterMovement()->bOrientRotationToMovement = false;
 		DFNCharacter->bUseControllerRotationYaw = true;
+
+		if(EquippedWeapon->EquipSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, EquippedWeapon->EquipSound, DFNCharacter->GetActorLocation());
+		}
 	}
 }
 
@@ -246,8 +250,8 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		if(DFNCharacter)
 		{
 			// Extend the Start of our LineTrace - a bit in front of our character to not trace ourself
-			float DistanceFromCharacterToLineTrace = (DFNCharacter->GetActorLocation() - Start).Size();
-			Start += CrosshairWorldDirection * (DistanceFromCharacterToLineTrace - 30.f);
+			const float DistanceFromCharacterToLineTrace = (DFNCharacter->GetActorLocation() - Start).Size();
+			Start += CrosshairWorldDirection * (DistanceFromCharacterToLineTrace + 100.f);
 		}
 		
 		// Line trace end (80,000 units).
@@ -257,7 +261,7 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		GetWorld()->LineTraceSingleByChannel(TraceHitResult, Start, End, ECC_Visibility);
 
 		// Check if actor is valid and if the actor has our UInterfaceCrosshairInteraction implemented on its class
-		if(IsValid(TraceHitResult.GetActor()) && TraceHitResult.GetActor()->Implements<UInterfaceCrosshairInteraction>())
+		if(TraceHitResult.GetActor() && TraceHitResult.GetActor()->Implements<UInterfaceCrosshairInteraction>())
 		{
 			//Sets our crosshair's color
 			HUDPackage.CrosshairColor = FLinearColor::Red;
@@ -300,9 +304,9 @@ void UCombatComponent::InterpFOV(float DeltaSeconds)
 		CurrentFOV = FMath::FInterpTo(CurrentFOV, DefaultFOV, DeltaSeconds, ZoomInterpSpeed);
 	}
 		//Sets the camera FOV
-	if(DFNCharacter && DFNCharacter->GetFirstPersonCamera())
+	if(DFNCharacter && DFNCharacter->GetThirdPersonCamera())
 	{
-		DFNCharacter->GetFirstPersonCamera()->SetFieldOfView(CurrentFOV);
+		DFNCharacter->GetThirdPersonCamera()->SetFieldOfView(CurrentFOV);
 	}
 }
 
@@ -333,7 +337,7 @@ void UCombatComponent::Fire()
 bool UCombatComponent::CanFire() const
 {
 	if(EquippedWeapon == nullptr) return false;
-	return !EquippedWeapon->IsEmpty() || !bCanFire;
+	return !EquippedWeapon->IsEmpty() && bCanFire && CombatState == ECombatState::ECS_Unoccupied;
 }
 
 void UCombatComponent::OnRep_CarriedAmmo()
@@ -349,7 +353,7 @@ void UCombatComponent::InitializeCarriedAmmo()
 {
 	//Initializing Ammo for each weapon type
 	CarriedAmmoMap.Emplace(EWeaponType::EWT_AssaultRifle, StartingAmmoAR);
-}	
+}
 
 void UCombatComponent::StartFireTimer()
 {
@@ -366,6 +370,10 @@ void UCombatComponent::FireTimerFinished()
 	{
 		Fire();
 	}
+	if(EquippedWeapon->IsEmpty())
+	{
+		Reload();
+	}
 }
 
 void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
@@ -377,9 +385,93 @@ void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& T
 {
 	if(!IsValid(EquippedWeapon)) return;
 	if(!IsValid(DFNCharacter)) return;
-	if(DFNCharacter)
+	if(DFNCharacter && CombatState == ECombatState::ECS_Unoccupied)
 	{
 		DFNCharacter->PlayFireMontage(bFiring);
 		EquippedWeapon->Fire(TraceHitTarget);
 	}
+}
+
+void UCombatComponent::Reload()
+{
+	//play reload animation
+	if(CarriedAmmo > 0 && CombatState != ECombatState::ECS_Reloading)
+	{
+		ServerReload();
+	}
+}
+
+void UCombatComponent::ServerReload_Implementation()
+{
+	if(DFNCharacter == nullptr || EquippedWeapon == nullptr) return;
+	CombatState = ECombatState::ECS_Reloading;
+	HandleReload();
+}
+
+void UCombatComponent::FinishReloading()
+{
+	if(DFNCharacter == nullptr) return;
+
+	if(DFNCharacter->HasAuthority())
+	{
+		CombatState = ECombatState::ECS_Unoccupied;
+		UpdateAmmoValues();
+	}
+	if(bFireButtonPressed)
+	{
+		Fire();
+	}
+}
+
+void UCombatComponent::UpdateAmmoValues()
+{
+	if (DFNCharacter == nullptr || EquippedWeapon == nullptr) return;
+	int32 ReloadAmount = AmountToReload();
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		CarriedAmmoMap[EquippedWeapon->GetWeaponType()] -= ReloadAmount;
+		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
+	}
+	Controller = Controller == nullptr ? Cast<ADFNPlayerController>(DFNCharacter->Controller) : Controller;
+	if (Controller)
+	{
+		Controller->UpdateHUDCarriedAmmo(CarriedAmmo);
+	}
+	EquippedWeapon->AddAmmo(-ReloadAmount);
+}
+
+void UCombatComponent::OnRep_CombatState()
+{
+	switch (CombatState)
+	{
+	case ECombatState::ECS_Reloading:
+		HandleReload();
+		break;
+	case ECombatState::ECS_Unoccupied:
+		if(bFireButtonPressed)
+		{
+			Fire();
+		}
+	default:
+		break;
+	}
+}
+
+void UCombatComponent::HandleReload()
+{
+	DFNCharacter->PlayReloadMontage();
+}
+
+
+int32 UCombatComponent::AmountToReload()
+{
+	if (EquippedWeapon == nullptr) return 0;
+	int32 RoomInMag = EquippedWeapon->GetMagCapacity() - EquippedWeapon->GetAmmo();
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		int32 AmountCarried = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
+		int32 Least = FMath::Min(RoomInMag, AmountCarried);
+		return FMath::Clamp(RoomInMag, 0, Least);
+	}
+	return 0;
 }

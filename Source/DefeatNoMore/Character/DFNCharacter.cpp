@@ -23,9 +23,9 @@ ADFNCharacter::ADFNCharacter()
 	SpringArm->SetRelativeLocationAndRotation(SpringArmLocation, SpringArmRotation);
 	
 	// First Person camera - attached to mesh(head socket), location and rotation set.
-	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	FirstPersonCamera->AttachToComponent(SpringArm, FAttachmentTransformRules::KeepRelativeTransform);
-	FirstPersonCamera->bUsePawnControlRotation = true;
+	ThirdPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
+	ThirdPersonCamera->AttachToComponent(SpringArm, FAttachmentTransformRules::KeepRelativeTransform);
+	ThirdPersonCamera->bUsePawnControlRotation = true;
 	
 	//CombatComponent
 	CombatComp = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
@@ -69,38 +69,16 @@ void ADFNCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	UpdateHUDHealth();
 	if(HasAuthority())
 	{
 		OnTakeAnyDamage.AddDynamic(this, &ADFNCharacter::ReceiveDamage);
 	}
+	UpdateHUDHealth();
 }
 
 void ADFNCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-
-	/* I commented it out but don't recall the whole thing exactly -.-, will come back to this later
-	 * better keep it, it relates to the character turninPlace animations, to be fixed
-	 * it works better WITHOUT this extra logic around, but not perfect as I want.
-	 * we must go with procedural animations - DFN
-	 */
-	
-	// if(GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled()) // same as IsLocallyControlled
-	// {
-	// 	AimOffset(DeltaSeconds);
-	// }
-	// else
-	// {
-	// 	// TimeSinceLastMovementReplication += DeltaSeconds;
-	// 	// if(TimeSinceLastMovementReplication > 0.03f)
-	// 	// {
-	// 	// 	OnRep_ReplicatedMovement();
-	// 	// }
-	// 	TurnInPlace(DeltaSeconds);
-	//
-	// 	CalculateAO_Pitch();
-	// }
 	AimOffset(DeltaSeconds);
 	PollInit();
 }
@@ -248,7 +226,7 @@ void ADFNCharacter::TurnInPlace(float DeltaSeconds)
 	{
 		InterpAO_Yaw = FMath::FInterpTo(InterpAO_Yaw, 0.f, DeltaSeconds, 4.f);
 		AO_Yaw = InterpAO_Yaw;
-		if (FMath::Abs(AO_Yaw) < 45.f)
+		if (FMath::Abs(AO_Yaw) < 15.f)
 		{
 			TurningInPlace = ETurnInPlace::ETIP_NotTurning;
 			StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
@@ -328,7 +306,7 @@ void ADFNCharacter::PlayFireMontage(bool bFiring)
 	}
 }
 
-void ADFNCharacter::PlayReloadMontage()
+void ADFNCharacter::PlayReloadMontage() const
 {
 	if (CombatComp == nullptr || CombatComp->EquippedWeapon == nullptr) return;
 
@@ -343,6 +321,7 @@ void ADFNCharacter::PlayReloadMontage()
 		case EWeaponType::EWT_AssaultRifle:
 			SectionName = FName("Rifle");
 			break;
+		default: ;
 		}
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
@@ -376,7 +355,7 @@ void ADFNCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const UDam
 		{
 			DFNPlayerController = DFNPlayerController == nullptr ? Cast<ADFNPlayerController>(Controller) : DFNPlayerController;
 			ADFNPlayerController* AttackerController = Cast<ADFNPlayerController>(InstigatorController);
-			DFNGameMode->PlayerEliminated(this, DFNPlayerController, AttackerController);
+			DFNGameMode->PlayerEliminated(Cast<ADFNCharacter>(DamagedActor), DFNPlayerController, AttackerController);
 		}
 	}
 }
@@ -478,6 +457,12 @@ void ADFNCharacter::PollInit()
 			DFNPlayerState->AddToDefeats(0);
 		}
 	}
+}
+
+ECombatState ADFNCharacter::GetCombatState() const
+{
+	if (CombatComp == nullptr) return ECombatState::ECS_MAX;
+	return CombatComp->CombatState;
 }
 
 FVector ADFNCharacter::GetHitTarget() const

@@ -4,6 +4,9 @@
 #include "GameFramework/Character.h"
 #include "Camera/CameraActor.h"
 #include "Components/TimelineComponent.h"
+
+#include "DefeatNoMore/Enums/CombatState.h"
+
 #include "GameFramework/SpringArmComponent.h"
 #include "DefeatNoMore/Enums/TurnInPlace.h"
 #include "DefeatNoMore/Interfaces/InterfaceCrosshairInteraction.h"
@@ -28,7 +31,7 @@ public:
 	virtual void PostInitializeComponents() override;
 	virtual void OnRep_ReplicatedMovement() override;
 	void PlayFireMontage(bool bFiring);
-	void PlayReloadMontage();
+	void PlayReloadMontage() const;
 
 	// Eliminations 
 	void Elimination();
@@ -81,9 +84,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = SpringArm)
 	USpringArmComponent* SpringArm;
 	UPROPERTY(EditDefaultsOnly, Category = Camera)
-	UCameraComponent* FirstPersonCamera;
-	// CombatComponent, handles all of ours combat actions
+	UCameraComponent* ThirdPersonCamera;
 	
+	// CombatComponent, handles all of ours combat actions
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UCombatComponent* CombatComp;
 		
@@ -191,8 +194,10 @@ public:
 	FORCEINLINE bool GetIsFiring() const { return bIsFiring; }
 
 	FORCEINLINE ETurnInPlace GetTurnInPlace() const { return TurningInPlace; }
-	FORCEINLINE UCameraComponent* GetFirstPersonCamera() const { return FirstPersonCamera; }
+	FORCEINLINE UCameraComponent* GetThirdPersonCamera() const { return ThirdPersonCamera; }
 	FORCEINLINE UCombatComponent* GetCombatComponent() const { return CombatComp; }
+
+	ECombatState GetCombatState() const;
 	
 	FVector GetHitTarget() const;
 };
