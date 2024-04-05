@@ -170,8 +170,7 @@ void AWeapon::Fire(const FVector& HitTarget)
 
 void AWeapon::SpendAmmoRound()
 {
-	--Ammo;
-	Ammo = FMath::Clamp(Ammo -1, 0, MagCapacity);
+	Ammo = FMath::Clamp(--Ammo, 0, MagCapacity);
 	SetHUDAmmo();
 }
 
