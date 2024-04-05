@@ -394,8 +394,8 @@ void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& T
 
 void UCombatComponent::Reload()
 {
-	//play reload animation
-	if(CarriedAmmo > 0 && CombatState != ECombatState::ECS_Reloading)
+	if(EquippedWeapon == nullptr) return;
+	if(EquippedWeapon->GetAmmo() != EquippedWeapon->GetMagCapacity() && CarriedAmmo > 0 && CombatState != ECombatState::ECS_Reloading)
 	{
 		ServerReload();
 	}
