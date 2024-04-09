@@ -170,6 +170,7 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	}
 	EquippedWeapon = WeaponToEquip;
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+	
 	const USkeletalMeshSocket* HandSocket = DFNCharacter->GetMesh()->GetSocketByName(FName("RightHandSocket"));
 	if(HandSocket)
 	{
@@ -177,6 +178,7 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	}
 	EquippedWeapon->SetOwner(DFNCharacter);
 	EquippedWeapon->SetHUDAmmo();
+	EquippedWeapon->SetHUDWeaponImage();
 	bIsWeaponEquipped = true;
 
 	// replicated
@@ -184,7 +186,6 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	{
 		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
 	}
-	
 	Controller = Controller == nullptr ? Cast<ADFNPlayerController>(DFNCharacter->Controller) : Controller;
 	if(Controller)
 	{

@@ -43,7 +43,6 @@ void AWeapon::BeginPlay()
 void AWeapon::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 }
 
 void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -83,6 +82,20 @@ void AWeapon::SetHUDAmmo()
 		if(OwnerController)
 		{
 			OwnerController->UpdateHUDWeaponAmmo(Ammo);
+		}
+	}
+}
+
+void AWeapon::SetHUDWeaponImage()
+{
+	if(WeaponTexture == nullptr) return;
+	OwnerCharacter = OwnerCharacter == nullptr ? Cast<ADFNCharacter>(GetOwner()) : OwnerCharacter;
+	if(OwnerCharacter)
+	{
+		OwnerController = OwnerController == nullptr ? Cast<ADFNPlayerController>(OwnerCharacter->Controller) : OwnerController;
+		if(OwnerController)
+		{
+			OwnerController->UpdateHUDWeaponImage(WeaponTexture);
 		}
 	}
 }
@@ -216,5 +229,6 @@ void AWeapon::OnRep_Owner()
 	else
 	{
 		SetHUDAmmo();
+		SetHUDWeaponImage();
 	}
 }

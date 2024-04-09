@@ -26,6 +26,7 @@ public:
 	void UpdatePlayerDefeats(int32 Defeats);
 	void UpdateHUDWeaponAmmo(int32 Ammo);
 	void UpdateHUDCarriedAmmo(int32 CarriedAmmo);
+	void UpdateHUDWeaponImage(UTexture2D* WeaponImage);
 
 	virtual void OnPossess(APawn* InPawn) override;
 	
@@ -86,5 +87,4 @@ protected:
 
 	UPROPERTY()
 	ADFNCharacter* DFNCharacter;
-	
 };

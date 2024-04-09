@@ -148,10 +148,10 @@ private:
 	void OnRep_CarriedAmmo();
 
 	TMap<EWeaponType, int32> CarriedAmmoMap;
-
+	
 	UPROPERTY(EditAnywhere)
 	int32 StartingAmmoAR = 30;
-	
+		
 	void InitializeCarriedAmmo();
 
 	UPROPERTY(ReplicatedUsing = OnRep_CombatState)

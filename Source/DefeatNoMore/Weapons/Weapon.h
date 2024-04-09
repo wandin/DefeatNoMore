@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+#include "Components/Image.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/Actor.h"
 #include "DefeatNoMore/Enums/WeaponTypes.h"
@@ -40,6 +42,7 @@ public:
 
 	virtual void OnRep_Owner() override;
 	void SetHUDAmmo();
+	void SetHUDWeaponImage();
 	
 	// we are overriding Fire in ProjectileWeapon
 	virtual void Fire(const FVector& HitTarget);
@@ -102,8 +105,12 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	EWeaponType WeaponType;
+
 public:
 
+	UPROPERTY(Replicated, EditAnywhere, Category = "Weapon")
+	UTexture2D* WeaponTexture;
+	
 	UPROPERTY(EditAnywhere)
 	class USoundCue* EquipSound;
 	

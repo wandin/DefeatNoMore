@@ -99,6 +99,19 @@ void ADFNPlayerController::UpdateHUDCarriedAmmo(int32 CarriedAmmo)
 	}
 }
 
+void ADFNPlayerController::UpdateHUDWeaponImage(UTexture2D* WeaponImage)
+{
+	PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
+	bool bHUDValid = PlayerHUD &&
+		PlayerHUD->PlayerOverlay &&
+		PlayerHUD->PlayerOverlay->CarriedAmmoAmount;
+	if (bHUDValid)
+	{
+		PlayerHUD->PlayerOverlay->WeaponImageField->SetBrushFromTexture(WeaponImage);
+		PlayerHUD->PlayerOverlay->WeaponImageField->SetOpacity(1.0f);
+	}
+}
+
 void ADFNPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);

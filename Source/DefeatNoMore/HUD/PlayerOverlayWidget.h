@@ -4,6 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+
+#include "Components/Image.h"
+
 #include "PlayerOverlayWidget.generated.h"
 
 
@@ -34,4 +37,7 @@ public:
 
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* CarriedAmmoAmount;
+
+	UPROPERTY(meta = (BindWidget))
+	UImage* WeaponImageField;
 };
