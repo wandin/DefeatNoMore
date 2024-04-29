@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "DFNGameMode.h"
 
 #include "GameFramework/PlayerStart.h"
@@ -8,6 +7,49 @@
 #include "DefeatNoMore/PlayerState/DFNPlayerState.h"
 #include "DefeatNoMore/Character/DFNCharacter.h"
 #include "DefeatNoMore/PlayerController/DFNPlayerController.h"
+
+#include "Engine/World.h"
+
+ADFNGameMode::ADFNGameMode()
+{
+	bDelayedStart = true;
+}
+
+void ADFNGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	LevelStartingTime = GetWorld()->GetTimeSeconds();
+}
+
+void ADFNGameMode::OnMatchStateSet()
+{
+	Super::OnMatchStateSet();
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		ADFNPlayerController* PC = Cast<ADFNPlayerController>(*It);
+		if(PC)
+		{
+			PC->OnMatchStateSet(MatchState);
+		}
+	}
+}
+
+void ADFNGameMode::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if(MatchState == ::MatchState::WaitingToStart)
+	{
+		CountDownTime = WarmupTime - GetWorld()->GetTimeSeconds() + LevelStartingTime;
+
+		if(CountDownTime <= 0.f)
+		{
+			StartMatch();
+		}
+	}
+}
 
 void ADFNGameMode::PlayerEliminated(ADFNCharacter* ElimmedCharacter, ADFNPlayerController* VictimController,
                                     ADFNPlayerController* AttackerController)

@@ -41,8 +41,7 @@ public:
 	TSubclassOf<UUserWidget> PlayerOverlayClass;
 	UPROPERTY()
 	class UPlayerOverlayWidget* PlayerOverlay;
-	
-protected:
+
 	void AddPlayerOverlay();
 
 private:

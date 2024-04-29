@@ -6,6 +6,10 @@
 #include "PlayerOverlayWidget.h"
 #include "Blueprint/UserWidget.h"
 
+#include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/Texture2D.h"
+
 void ADFNHUD::DrawHUD()
 {
 	Super::DrawHUD();
@@ -51,8 +55,6 @@ void ADFNHUD::DrawHUD()
 void ADFNHUD::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	AddPlayerOverlay();
 }
 
 void ADFNHUD::AddPlayerOverlay()

@@ -20,6 +20,7 @@ class DEFEATNOMORE_API ADFNPlayerController : public APlayerController
 public:
 	virtual void SetupInputComponent() override;
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	void UpdatePlayerHealth(float Health, float MaxHealth);
 	void UpdatePlayerScore(float Score);
@@ -27,13 +28,22 @@ public:
 	void UpdateHUDWeaponAmmo(int32 Ammo);
 	void UpdateHUDCarriedAmmo(int32 CarriedAmmo);
 	void UpdateHUDWeaponImage(UTexture2D* WeaponImage);
+	void SetHUDMatchCountDown(float CountDownTime);
 
 	virtual void OnPossess(APawn* InPawn) override;
-	
+	virtual void Tick(float DeltaSeconds) override;
+	virtual float GetServerTime(); //synced with Server World clock
 
+	virtual void ReceivedPlayer() override; // sync with Server Clock as soon as possible.
+
+	void OnMatchStateSet(FName State);
+	
 protected:
 	virtual void BeginPlay() override;
 
+	UPROPERTY()
+	ADFNCharacter* DFNCharacter;
+	
 	// Input calls
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
@@ -53,6 +63,38 @@ protected:
 	void ServerWalkPressed();
 	UFUNCTION(Server, Unreliable)
 	void ServerWalkReleased();
+
+
+	void SetHUDTime();
+
+	// Sync time between client and Server
+	/*
+	 * Requests the current server time, passing in the client`s time when the request was sent
+	 * @param TimeofClientRequest 
+	 */
+	UFUNCTION(Server, Reliable)
+	void ServerRequestServerTime(float TimeofClientRequest);
+
+	
+	/**
+	 * Reports the current Server time to the Client and the time when the server received the Client Request
+	 * @param TimeofCLientRequest 
+	 * @param TimeServerReceivedClientRequest 
+	 */
+	UFUNCTION(Client, Reliable)
+	void ClientReportServerTime(float TimeofCLientRequest, float TimeServerReceivedClientRequest);
+
+	// Difference between client and server time.
+	float ClientServerDelta = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "Time")
+	float TimeSyncFrequency = 5.f;
+
+	float TimeSyncRunningTime = 0.f;
+
+	void CheckTimeSync(float DeltaSeconds);
+
+	void PollInit();
 
 private:
 
@@ -82,9 +124,23 @@ private:
 	
 	UPROPERTY()
 	class ADFNHUD* PlayerHUD;
+	
+	float MatchTime = 120.f;
+	uint32 CountDownInt;
 
-protected:
+	UPROPERTY(ReplicatedUsing = OnRep_MatchState)
+	FName MatchState;
+
+	UFUNCTION()
+	void OnRep_MatchState();
 
 	UPROPERTY()
-	ADFNCharacter* DFNCharacter;
+	class UPlayerOverlayWidget* PlayerOverlay;
+
+	bool bInitializedCharacterOverlay = false;
+
+	float HUDHealth;
+	float HUDMaxHealth;
+	float HUDScore;
+	int32 HUDDefeats;
 };

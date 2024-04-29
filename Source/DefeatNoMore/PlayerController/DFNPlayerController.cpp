@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "DFNPlayerController.h"
 
 #include "EnhancedInputComponent.h"
@@ -13,6 +12,10 @@
 #include "DefeatNoMore/HUD/PlayerOverlayWidget.h"
 #include "DefeatNoMore/HUD/DFNHUD.h"
 
+#include "GameFramework/GameMode.h"
+
+#include "Net/UnrealNetwork.h"
+
 
 void ADFNPlayerController::BeginPlay()
 {
@@ -24,12 +27,47 @@ void ADFNPlayerController::BeginPlay()
 	{
 		Subsystem->AddMappingContext(DefaultMappingContext, 0);
 	}
-	
 	DFNCharacter = Cast<ADFNCharacter>(GetCharacter());
 	if(DFNCharacter)
 	{
 		UpdatePlayerHealth(DFNCharacter->GetHealth(), DFNCharacter->GetMaxHealth());
 		DFNCharacter->EnableInput(this);
+	}
+}
+
+void ADFNPlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	SetHUDTime();
+	CheckTimeSync(DeltaSeconds);
+	PollInit();
+}
+
+void ADFNPlayerController::CheckTimeSync(float DeltaSeconds)
+{
+	TimeSyncRunningTime += ClientServerDelta;
+	if(IsLocalController() && TimeSyncRunningTime > TimeSyncFrequency)
+	{
+		ServerRequestServerTime(GetWorld()->GetTimeSeconds());
+		TimeSyncRunningTime = 0.f;
+	}
+}
+
+void ADFNPlayerController::PollInit()
+{
+	if(PlayerOverlay == nullptr)
+	{
+		if(PlayerHUD && PlayerHUD->PlayerOverlay)
+		{
+			PlayerOverlay = PlayerHUD->PlayerOverlay;
+			if(PlayerOverlay)
+			{
+				UpdatePlayerHealth(HUDHealth, HUDMaxHealth);
+				UpdatePlayerScore(HUDScore);
+				UpdatePlayerDefeats(HUDDefeats);
+			}
+		}
 	}
 }
 
@@ -47,6 +85,12 @@ void ADFNPlayerController::UpdatePlayerHealth(float Health, float MaxHealth)
 		const FString HealthText = FString::Printf(TEXT("%d"), FMath::CeilToInt(Health));
 		PlayerHUD->PlayerOverlay->HealthText->SetText(FText::FromString(HealthText));
 	}
+	else
+	{
+		bInitializedCharacterOverlay = true;
+		HUDHealth = Health;
+		HUDMaxHealth = MaxHealth;
+	}
 }
 
 void ADFNPlayerController::UpdatePlayerScore(float Score)
@@ -60,6 +104,11 @@ void ADFNPlayerController::UpdatePlayerScore(float Score)
 		FString ScoreText = FString::Printf(TEXT("%d"), FMath::FloorToInt(Score));
 		PlayerHUD->PlayerOverlay->ScoreAmount->SetText(FText::FromString(ScoreText));
 	}
+	else
+	{
+		bInitializedCharacterOverlay = true;
+		HUDScore = Score;
+	}
 }
 
 void ADFNPlayerController::UpdatePlayerDefeats(int32 Defeats)
@@ -72,6 +121,11 @@ void ADFNPlayerController::UpdatePlayerDefeats(int32 Defeats)
 	{
 		FString DefeatsText = FString::Printf(TEXT("%d"), Defeats);
 		PlayerHUD->PlayerOverlay->DefeatsAmount->SetText(FText::FromString(DefeatsText));
+	}
+	else
+	{
+		bInitializedCharacterOverlay = true;
+		HUDDefeats = Defeats;
 	}
 }
 
@@ -158,6 +212,13 @@ void ADFNPlayerController::SetupInputComponent()
 		EIC->BindAction(ReloadAction, ETriggerEvent::Started, this, &ADFNPlayerController::ReloadButtonPressed);
 
 	}
+}
+
+void ADFNPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ADFNPlayerController, MatchState);
 }
 
 void ADFNPlayerController::Move(const FInputActionValue& Value)
@@ -297,5 +358,94 @@ void ADFNPlayerController::ReloadButtonPressed()
 	if(DFNCharacter && DFNCharacter->GetCombatComponent())
 	{
 		DFNCharacter->GetCombatComponent()->Reload();
+	}
+}
+
+void ADFNPlayerController::SetHUDMatchCountDown(float CountDownTime)
+{
+	PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
+	bool bHUDValid = PlayerHUD &&
+		PlayerHUD->PlayerOverlay &&
+		PlayerHUD->PlayerOverlay->MatchCountDownText;
+	if (bHUDValid)
+	{
+		int32 Minutes = FMath::FloorToInt(CountDownTime / 60);
+		int32 Seconds = CountDownTime - Minutes * 60;
+		FString CountdownText = FString::Printf(TEXT("%02d:%02d"), Minutes, Seconds);
+		PlayerHUD->PlayerOverlay->MatchCountDownText->SetText(FText::FromString(CountdownText));
+	}
+}
+
+void ADFNPlayerController::SetHUDTime()
+{
+	uint32 SecondsLeft = FMath::CeilToInt(MatchTime - GetServerTime());
+
+	if(CountDownInt != SecondsLeft)
+	{
+		SetHUDMatchCountDown(MatchTime - GetServerTime());
+	}
+	CountDownInt = SecondsLeft;
+}
+
+void ADFNPlayerController::ServerRequestServerTime_Implementation(float TimeofClientRequest)
+{
+	float ServerTimeofReceipt = GetWorld()->GetTimeSeconds();
+
+	ClientReportServerTime(TimeofClientRequest, ServerTimeofReceipt);
+}
+
+void ADFNPlayerController::ClientReportServerTime_Implementation(float TimeofCLientRequest,
+	float TimeServerReceivedClientRequest)
+{
+	float RoundTripTime = GetWorld()->GetTimeSeconds() - TimeofCLientRequest;
+	float CurrentServerTime = TimeServerReceivedClientRequest + (0.5f * RoundTripTime);
+	ClientServerDelta = CurrentServerTime - GetWorld()->GetTimeSeconds();
+}
+
+float ADFNPlayerController::GetServerTime()
+{
+	if(HasAuthority())
+	{
+		return GetWorld()->GetTimeSeconds();
+	}
+	else
+	{
+		return GetWorld()->GetTimeSeconds() + ClientServerDelta;
+	}
+}
+
+void ADFNPlayerController::ReceivedPlayer()
+{
+	Super::ReceivedPlayer();
+
+	if(IsLocalController())
+	{
+		ServerRequestServerTime(GetWorld()->GetTimeSeconds());
+	}
+}
+
+void ADFNPlayerController::OnMatchStateSet(FName State)
+{
+	MatchState = State;
+
+	if(MatchState == MatchState::InProgress)
+	{
+		PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
+		if(PlayerHUD)
+		{
+			PlayerHUD->AddPlayerOverlay();
+		}
+	}
+}
+
+void ADFNPlayerController::OnRep_MatchState()
+{
+	if(MatchState == MatchState::InProgress)
+	{
+		PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
+		if(PlayerHUD)
+		{
+			PlayerHUD->AddPlayerOverlay();
+		}
 	}
 }
