@@ -2,6 +2,8 @@
 
 #include "BulletShell.h"
 
+#include "Components/StaticMeshComponent.h"
+
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
 
