@@ -25,7 +25,7 @@ public:
 private:
 	//	Character and properties
 	UPROPERTY(BlueprintReadOnly, Category = Character, meta = (AllowPrivateAccess = "true"))
-	class ADFNCharacter* DFNCharacter;
+	ADFNCharacter* DFNCharacter;
 	UPROPERTY(BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
 	float Speed;
 	UPROPERTY(BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))

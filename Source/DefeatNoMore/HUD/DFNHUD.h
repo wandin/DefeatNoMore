@@ -37,12 +37,21 @@ public:
 	virtual void DrawHUD() override;
 	virtual void BeginPlay() override;
 
+	/* Player Overlay - with basic player Infos, such as Health, Ammo, Score, Death */
 	UPROPERTY(EditAnywhere, Category = "Player Stats")
 	TSubclassOf<UUserWidget> PlayerOverlayClass;
 	UPROPERTY()
 	class UPlayerOverlayWidget* PlayerOverlay;
-
 	void AddPlayerOverlay();
+	/* End of Player Overlay */
+
+	/* Annoucement Overlay - with info about WarmupTime*/
+	UPROPERTY(EditAnywhere, Category = "Player Stats")
+	TSubclassOf<UUserWidget> AnnoucementOverlayClass;
+	UPROPERTY()
+	class UAnnouncement* AnnouncementOverlay;
+	void AddAnnouncementOverlay();
+	/* End od Annoucement Overlay */
 
 private:
 	FHUDPackage HUDPackage;

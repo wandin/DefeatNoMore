@@ -4,13 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
-#include "InputActionValue.h"
 #include "DFNPlayerController.generated.h"
 
 
 class ADFNCharacter;
-class UInputMappingContext;
-class UInputAction;
 
 UCLASS()
 class DEFEATNOMORE_API ADFNPlayerController : public APlayerController
@@ -18,53 +15,35 @@ class DEFEATNOMORE_API ADFNPlayerController : public APlayerController
 	GENERATED_BODY()
 
 public:
-	virtual void SetupInputComponent() override;
-
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
+	
 	void UpdatePlayerHealth(float Health, float MaxHealth);
 	void UpdatePlayerScore(float Score);
 	void UpdatePlayerDefeats(int32 Defeats);
 	void UpdateHUDWeaponAmmo(int32 Ammo);
 	void UpdateHUDCarriedAmmo(int32 CarriedAmmo);
 	void UpdateHUDWeaponImage(UTexture2D* WeaponImage);
-	void SetHUDMatchCountDown(float CountDownTime);
+	void SetHUDMatchCountDown(float MatchCountDownTime);
+	void SetHUDWarmupCountDown(float WarmupCountDownTime);
 
-	virtual void OnPossess(APawn* InPawn) override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void OnPossess(APawn* InPawn) override;
 	virtual float GetServerTime(); //synced with Server World clock
 
 	virtual void ReceivedPlayer() override; // sync with Server Clock as soon as possible.
 
 	void OnMatchStateSet(FName State);
+	void HandleMatchHasStarted();
+	void HandleCooldown();
 	
 protected:
 	virtual void BeginPlay() override;
 
+	void PollInit();
+	
 	UPROPERTY()
 	ADFNCharacter* DFNCharacter;
 	
-	// Input calls
-	void Move(const FInputActionValue& Value);
-	void Look(const FInputActionValue& Value);
-	void Jump();
-	void CharacterStopJumping(); // we`ll call the character`s stopJump() method;
-	void CrouchPressed();
-	void WalkPressed();
-	void WalkReleased();
-	void AimButtonPressed();
-	void AimButtonReleased();
-	void FireButtonPressed();
-	void FireButtonReleased();
-	void ReloadButtonPressed();
-	
-	// calls ServerWalkPressed, which set variables that are already replicated on CharacterMovementComponent.
-	UFUNCTION(Server, Unreliable)
-	void ServerWalkPressed();
-	UFUNCTION(Server, Unreliable)
-	void ServerWalkReleased();
-
-
 	void SetHUDTime();
 
 	// Sync time between client and Server
@@ -94,38 +73,24 @@ protected:
 
 	void CheckTimeSync(float DeltaSeconds);
 
-	void PollInit();
+	UFUNCTION(Server, Reliable)
+	void ServerCheckMatchState();
+
+	UFUNCTION(Client, Reliable)
+	void ClientJoinMidGame(FName StateOfMatch, float TimeWarmup, float TimeMatch, float TimeCoolDown, float StartingTime);
 
 private:
-
-	/*------------------INPUT------------------*/
-	/* MappingContext */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
-	UInputMappingContext* DefaultMappingContext;
-	/** Actions */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
-	UInputAction* JumpAction;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
-	UInputAction* MoveAction;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
-	UInputAction* WalkAction;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* LookAction;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* CrouchAction;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* AimAction;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* FireAction;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* ReloadAction;
-	
-	/* ------------ END INPUT ---------------*/
-	
 	UPROPERTY()
-	class ADFNHUD* PlayerHUD;
+	class ADFNHUD* GameHUD;
+
+	UPROPERTY()
+	class ADFNGameMode* DFNGameMode;
+
+	float LevelStartTime = 0.f;
+	float MatchTime = 0.f;
+	float WarmupTime = 0.f;
+	float CooldownTime = 0.f;
 	
-	float MatchTime = 120.f;
 	uint32 CountDownInt;
 
 	UPROPERTY(ReplicatedUsing = OnRep_MatchState)

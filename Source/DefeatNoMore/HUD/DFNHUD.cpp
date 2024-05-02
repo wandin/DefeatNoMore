@@ -3,6 +3,7 @@
 
 #include "DFNHUD.h"
 
+#include "Announcement.h"
 #include "PlayerOverlayWidget.h"
 #include "Blueprint/UserWidget.h"
 
@@ -64,6 +65,16 @@ void ADFNHUD::AddPlayerOverlay()
 	{
 		PlayerOverlay = CreateWidget<UPlayerOverlayWidget>(PlayerController, PlayerOverlayClass);
 		PlayerOverlay->AddToViewport();
+	}
+}
+
+void ADFNHUD::AddAnnouncementOverlay()
+{
+	APlayerController* PlayerController = GetOwningPlayerController();
+	if(PlayerController && AnnoucementOverlayClass)
+	{
+		AnnouncementOverlay = CreateWidget<UAnnouncement>(PlayerController, AnnoucementOverlayClass);
+		AnnouncementOverlay->AddToViewport();
 	}
 }
 

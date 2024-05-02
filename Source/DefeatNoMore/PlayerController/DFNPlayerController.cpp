@@ -2,37 +2,34 @@
 
 #include "DFNPlayerController.h"
 
-#include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
+
+#include "InterchangeResult.h"
+#include "TimerManager.h"
+
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "DefeatNoMore/Character/DFNCharacter.h"
 #include "DefeatNoMore/Components/CombatComponent.h"
+#include "DefeatNoMore/GameModes/DFNGameMode.h"
+#include "DefeatNoMore/GameStates/DFNGameState.h"
+#include "DefeatNoMore/HUD/Announcement.h"
 #include "DefeatNoMore/HUD/PlayerOverlayWidget.h"
 #include "DefeatNoMore/HUD/DFNHUD.h"
+#include "DefeatNoMore/PlayerState/DFNPlayerState.h"
 
 #include "GameFramework/GameMode.h"
-
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
 
 void ADFNPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	GameHUD = Cast<ADFNHUD>(GetHUD());
 
-	PlayerHUD = Cast<ADFNHUD>(GetHUD());
-
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-	{
-		Subsystem->AddMappingContext(DefaultMappingContext, 0);
-	}
-	DFNCharacter = Cast<ADFNCharacter>(GetCharacter());
-	if(DFNCharacter)
-	{
-		UpdatePlayerHealth(DFNCharacter->GetHealth(), DFNCharacter->GetMaxHealth());
-		DFNCharacter->EnableInput(this);
-	}
+	ServerCheckMatchState();
 }
 
 void ADFNPlayerController::Tick(float DeltaSeconds)
@@ -42,6 +39,41 @@ void ADFNPlayerController::Tick(float DeltaSeconds)
 	SetHUDTime();
 	CheckTimeSync(DeltaSeconds);
 	PollInit();
+}
+
+void ADFNPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ADFNPlayerController, MatchState);
+}
+
+void ADFNPlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+		
+	DFNCharacter = Cast<ADFNCharacter>(InPawn);
+	if(DFNCharacter)
+	{
+		UpdatePlayerHealth(DFNCharacter->GetHealth(), DFNCharacter->GetMaxHealth());
+	}
+}
+
+void ADFNPlayerController::PollInit()
+{
+	if(PlayerOverlay == nullptr)
+	{
+		if(GameHUD && GameHUD->PlayerOverlay)
+		{
+			PlayerOverlay = GameHUD->PlayerOverlay;
+			if(PlayerOverlay)
+			{
+				UpdatePlayerHealth(HUDHealth, HUDMaxHealth);
+				UpdatePlayerScore(HUDScore);
+				UpdatePlayerDefeats(HUDDefeats);
+			}
+		}
+	}
 }
 
 void ADFNPlayerController::CheckTimeSync(float DeltaSeconds)
@@ -54,36 +86,49 @@ void ADFNPlayerController::CheckTimeSync(float DeltaSeconds)
 	}
 }
 
-void ADFNPlayerController::PollInit()
+void ADFNPlayerController::ServerCheckMatchState_Implementation()
 {
-	if(PlayerOverlay == nullptr)
+	ADFNGameMode* GameMode = Cast<ADFNGameMode>(UGameplayStatics::GetGameMode(this));
+	if(GameMode)
 	{
-		if(PlayerHUD && PlayerHUD->PlayerOverlay)
-		{
-			PlayerOverlay = PlayerHUD->PlayerOverlay;
-			if(PlayerOverlay)
-			{
-				UpdatePlayerHealth(HUDHealth, HUDMaxHealth);
-				UpdatePlayerScore(HUDScore);
-				UpdatePlayerDefeats(HUDDefeats);
-			}
-		}
+		LevelStartTime = GameMode->LevelStartingTime;
+		WarmupTime = GameMode->WarmupTime;
+		MatchTime = GameMode->MatchTime;
+		CooldownTime = GameMode->CooldownTime;
+		MatchState = GameMode->GetMatchState();
+		
+		ClientJoinMidGame(MatchState, WarmupTime, MatchTime, CooldownTime, LevelStartTime);
+	}
+}
+
+void ADFNPlayerController::ClientJoinMidGame_Implementation(FName StateOfMatch, float TimeWarmup, float TimeMatch, float TimeCoolDown, float StartingTime)
+{
+	LevelStartTime = StartingTime;
+	WarmupTime = TimeWarmup;
+	MatchTime = TimeMatch;
+	CooldownTime = TimeCoolDown;
+	MatchState = StateOfMatch;
+	OnMatchStateSet(MatchState);
+
+	if(GameHUD && MatchState == MatchState::WaitingToStart)
+	{
+		GameHUD->AddAnnouncementOverlay();
 	}
 }
 
 void ADFNPlayerController::UpdatePlayerHealth(float Health, float MaxHealth)
 {
-	PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
 
-	bool bHUDValid = PlayerHUD && PlayerHUD->PlayerOverlay && PlayerHUD->PlayerOverlay->HealthText &&
-				PlayerHUD->PlayerOverlay->HealthBar;
+	bool bHUDValid = GameHUD && GameHUD->PlayerOverlay && GameHUD->PlayerOverlay->HealthText &&
+				GameHUD->PlayerOverlay->HealthBar;
 	if(bHUDValid)
 	{
 		const float HealthPercentage = Health / MaxHealth;
-		PlayerHUD->PlayerOverlay->HealthBar->SetPercent(HealthPercentage);
+		GameHUD->PlayerOverlay->HealthBar->SetPercent(HealthPercentage);
 
 		const FString HealthText = FString::Printf(TEXT("%d"), FMath::CeilToInt(Health));
-		PlayerHUD->PlayerOverlay->HealthText->SetText(FText::FromString(HealthText));
+		GameHUD->PlayerOverlay->HealthText->SetText(FText::FromString(HealthText));
 	}
 	else
 	{
@@ -95,14 +140,14 @@ void ADFNPlayerController::UpdatePlayerHealth(float Health, float MaxHealth)
 
 void ADFNPlayerController::UpdatePlayerScore(float Score)
 {
-	PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
-	bool bHUDValid = PlayerHUD &&
-		PlayerHUD->PlayerOverlay &&
-		PlayerHUD->PlayerOverlay->ScoreAmount;
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	bool bHUDValid = GameHUD &&
+		GameHUD->PlayerOverlay &&
+		GameHUD->PlayerOverlay->ScoreAmount;
 	if (bHUDValid)
 	{
 		FString ScoreText = FString::Printf(TEXT("%d"), FMath::FloorToInt(Score));
-		PlayerHUD->PlayerOverlay->ScoreAmount->SetText(FText::FromString(ScoreText));
+		GameHUD->PlayerOverlay->ScoreAmount->SetText(FText::FromString(ScoreText));
 	}
 	else
 	{
@@ -113,14 +158,14 @@ void ADFNPlayerController::UpdatePlayerScore(float Score)
 
 void ADFNPlayerController::UpdatePlayerDefeats(int32 Defeats)
 {
-	PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
-	bool bHUDValid = PlayerHUD &&
-		PlayerHUD->PlayerOverlay &&
-		PlayerHUD->PlayerOverlay->DefeatsAmount;
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	bool bHUDValid = GameHUD &&
+		GameHUD->PlayerOverlay &&
+		GameHUD->PlayerOverlay->DefeatsAmount;
 	if (bHUDValid)
 	{
 		FString DefeatsText = FString::Printf(TEXT("%d"), Defeats);
-		PlayerHUD->PlayerOverlay->DefeatsAmount->SetText(FText::FromString(DefeatsText));
+		GameHUD->PlayerOverlay->DefeatsAmount->SetText(FText::FromString(DefeatsText));
 	}
 	else
 	{
@@ -131,258 +176,122 @@ void ADFNPlayerController::UpdatePlayerDefeats(int32 Defeats)
 
 void ADFNPlayerController::UpdateHUDWeaponAmmo(int32 Ammo)
 {
-	PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
-	bool bHUDValid = PlayerHUD && PlayerHUD->PlayerOverlay && PlayerHUD->PlayerOverlay->WeaponCurrentAmmo;
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	bool bHUDValid = GameHUD && GameHUD->PlayerOverlay && GameHUD->PlayerOverlay->WeaponCurrentAmmo;
 	if(bHUDValid)
 	{
 		FString AmmoText = FString::Printf(TEXT("%d"), Ammo);
-		PlayerHUD->PlayerOverlay->WeaponCurrentAmmo->SetText(FText::FromString(AmmoText));
+		GameHUD->PlayerOverlay->WeaponCurrentAmmo->SetText(FText::FromString(AmmoText));
 	}
 }
 
 void ADFNPlayerController::UpdateHUDCarriedAmmo(int32 CarriedAmmo)
 {
-	PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
-	bool bHUDValid = PlayerHUD &&
-		PlayerHUD->PlayerOverlay &&
-		PlayerHUD->PlayerOverlay->CarriedAmmoAmount;
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	bool bHUDValid = GameHUD &&
+		GameHUD->PlayerOverlay &&
+		GameHUD->PlayerOverlay->CarriedAmmoAmount;
 	if (bHUDValid)
 	{
 		FString CarriedAmmoText = FString::Printf(TEXT("%d"), CarriedAmmo);
-		PlayerHUD->PlayerOverlay->CarriedAmmoAmount->SetText(FText::FromString(CarriedAmmoText));
+		GameHUD->PlayerOverlay->CarriedAmmoAmount->SetText(FText::FromString(CarriedAmmoText));
 	}
 }
 
 void ADFNPlayerController::UpdateHUDWeaponImage(UTexture2D* WeaponImage)
 {
-	PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
-	bool bHUDValid = PlayerHUD &&
-		PlayerHUD->PlayerOverlay &&
-		PlayerHUD->PlayerOverlay->CarriedAmmoAmount;
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	bool bHUDValid = GameHUD &&
+		GameHUD->PlayerOverlay &&
+		GameHUD->PlayerOverlay->CarriedAmmoAmount;
 	if (bHUDValid)
 	{
-		PlayerHUD->PlayerOverlay->WeaponImageField->SetBrushFromTexture(WeaponImage);
-		PlayerHUD->PlayerOverlay->WeaponImageField->SetOpacity(1.0f);
+		GameHUD->PlayerOverlay->WeaponImageField->SetBrushFromTexture(WeaponImage);
+		GameHUD->PlayerOverlay->WeaponImageField->SetOpacity(1.0f);
 	}
 }
 
-void ADFNPlayerController::OnPossess(APawn* InPawn)
+void ADFNPlayerController::SetHUDMatchCountDown(float MatchCountDownTime)
 {
-	Super::OnPossess(InPawn);
-
-	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-	{
-		Subsystem->AddMappingContext(DefaultMappingContext, 0);
-	}
-	EnableInput(this);
-
-	
-	DFNCharacter = Cast<ADFNCharacter>(InPawn);
-	if(DFNCharacter)
-	{
-		UpdatePlayerHealth(DFNCharacter->GetHealth(), DFNCharacter->GetMaxHealth());
-		DFNCharacter->EnableInput(this);
-	}
-}
-
-void ADFNPlayerController::SetupInputComponent()
-{
-	Super::SetupInputComponent();
-	if(UEnhancedInputComponent* EIC = CastChecked<UEnhancedInputComponent>(InputComponent))
-	{
-		//Jump
-		EIC->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ADFNPlayerController::Jump);
-		EIC->BindAction(JumpAction, ETriggerEvent::Completed, this, &ADFNPlayerController::CharacterStopJumping);
-		//Move
-		EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ADFNPlayerController::Move);
-		// Walk (not running / no footstep sounds)
-		EIC->BindAction(WalkAction, ETriggerEvent::Triggered, this, &ADFNPlayerController::WalkPressed);
-		EIC->BindAction(WalkAction, ETriggerEvent::Completed, this, &ADFNPlayerController::WalkReleased);
-		//Look
-		EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &ADFNPlayerController::Look);
-		//Crouch
-		EIC->BindAction(CrouchAction, ETriggerEvent::Started, this, &ADFNPlayerController::CrouchPressed);
-		// Aim - ZoomFOV
-		EIC->BindAction(AimAction, ETriggerEvent::Triggered, this, &ADFNPlayerController::AimButtonPressed);
-		EIC->BindAction(AimAction, ETriggerEvent::Completed, this, &ADFNPlayerController::AimButtonReleased);
-		//Fire
-		EIC->BindAction(FireAction, ETriggerEvent::Started, this, &ADFNPlayerController::FireButtonPressed);
-		EIC->BindAction(FireAction, ETriggerEvent::Completed, this, &ADFNPlayerController::FireButtonReleased);
-
-		EIC->BindAction(ReloadAction, ETriggerEvent::Started, this, &ADFNPlayerController::ReloadButtonPressed);
-
-	}
-}
-
-void ADFNPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(ADFNPlayerController, MatchState);
-}
-
-void ADFNPlayerController::Move(const FInputActionValue& Value)
-{
-	// AddMovementInput takes a Vector
-	const FVector2d MovementVector = Value.Get<FVector2d>();
-	if(IsValid(DFNCharacter))
-	{
-		DFNCharacter->AddMovementInput(DFNCharacter->GetActorForwardVector(), MovementVector.Y);
-		DFNCharacter->AddMovementInput(DFNCharacter->GetActorRightVector(), MovementVector.X);
-	}
-}
-
-void ADFNPlayerController::Look(const FInputActionValue& Value)
-{
-	// AddControllerPitchInput takes a Vector
-	const FVector2d LookAxisVector = Value.Get<FVector2d>();
-	float Pitch = LookAxisVector.Y;
-	if(IsValid(DFNCharacter))
-	{
-		APlayerController* PC = Cast<APlayerController>(this);
-		PC->AddPitchInput(LookAxisVector.Y);
-		DFNCharacter->AddControllerYawInput(LookAxisVector.X);
-	}
-}
-
-void ADFNPlayerController::Jump()
-{
-	if(DFNCharacter)
-	{
-		if(DFNCharacter->bIsCrouched)
-		{
-			DFNCharacter->UnCrouch();
-		}
-		DFNCharacter->Jump();
-	}
-}
-
-void ADFNPlayerController::CharacterStopJumping()
-{
-	if(DFNCharacter)
-	{
-		DFNCharacter->StopJumping();
-	}
-}
-
-void ADFNPlayerController::CrouchPressed()
-{
-	if(DFNCharacter)
-	{
-		if(DFNCharacter->bIsCrouched)
-		{
-			DFNCharacter->UnCrouch();
-		}
-		DFNCharacter->Crouch();
-	}
-}
-
-void ADFNPlayerController::WalkPressed()
-{
-	if(DFNCharacter)
-	{
-		if(IsLocalController()) // if not right, we`ll try IsLocalController()
-		{
-			ServerWalkPressed();
-		}
-		DFNCharacter->bWalking = true;
-		DFNCharacter->GetCharacterMovement()->MaxWalkSpeed = 220.f;
-	}
-}
-
-void ADFNPlayerController::WalkReleased()
-{
-	if(DFNCharacter)
-	{
-		if(IsLocalController())
-		{
-			ServerWalkReleased();
-		}
-		DFNCharacter->bWalking = false;
-		DFNCharacter->GetCharacterMovement()->MaxWalkSpeed = 420.f;
-	}
-}
-
-void ADFNPlayerController::ServerWalkPressed_Implementation()
-{
-	if(DFNCharacter)
-	{
-		DFNCharacter->bWalking = true;
-		DFNCharacter->GetCharacterMovement()->MaxWalkSpeed = 220.f;
-	}
-}
-
-void ADFNPlayerController::ServerWalkReleased_Implementation()
-{
-	if(DFNCharacter)
-	{
-		DFNCharacter->bWalking = false;
-		DFNCharacter->GetCharacterMovement()->MaxWalkSpeed = 420.f;
-	}
-}
-
-void ADFNPlayerController::AimButtonPressed()
-{
-	if(DFNCharacter)
-	{
-		DFNCharacter->AimButtonPressed();
-	}
-}
-
-void ADFNPlayerController::AimButtonReleased()
-{
-	if(DFNCharacter)
-	{
-		DFNCharacter->AimButtonReleased();
-	}
-}
-
-void ADFNPlayerController::FireButtonPressed()
-{
-	if(DFNCharacter)
-	{
-		DFNCharacter->FireButtonPressed();
-	}
-}
-
-void ADFNPlayerController::FireButtonReleased()
-{
-	if(DFNCharacter)
-	{
-		DFNCharacter->FireButtonReleased();
-	}
-}
-
-void ADFNPlayerController::ReloadButtonPressed()
-{
-	if(DFNCharacter && DFNCharacter->GetCombatComponent())
-	{
-		DFNCharacter->GetCombatComponent()->Reload();
-	}
-}
-
-void ADFNPlayerController::SetHUDMatchCountDown(float CountDownTime)
-{
-	PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
-	bool bHUDValid = PlayerHUD &&
-		PlayerHUD->PlayerOverlay &&
-		PlayerHUD->PlayerOverlay->MatchCountDownText;
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	bool bHUDValid = GameHUD &&
+		GameHUD->PlayerOverlay &&
+		GameHUD->PlayerOverlay->MatchCountDownText;
 	if (bHUDValid)
 	{
-		int32 Minutes = FMath::FloorToInt(CountDownTime / 60);
-		int32 Seconds = CountDownTime - Minutes * 60;
+		if(MatchCountDownTime <= 15.f)
+		{
+			GameHUD->PlayerOverlay->MatchCountDownText->SetColorAndOpacity(FColor::Orange);
+		}
+		if(MatchCountDownTime <= 10.f)
+		{
+			GameHUD->PlayerOverlay->MatchCountDownText->SetColorAndOpacity(FColor::Red);
+		}
+		if(MatchCountDownTime < 0.f)
+		{
+			// If Countdown is negative we don't display it and return;
+			GameHUD->PlayerOverlay->MatchCountDownText->SetText(FText());
+			return;
+		}
+		int32 Minutes = FMath::FloorToInt(MatchCountDownTime / 60);
+		int32 Seconds = MatchCountDownTime - Minutes * 60;
 		FString CountdownText = FString::Printf(TEXT("%02d:%02d"), Minutes, Seconds);
-		PlayerHUD->PlayerOverlay->MatchCountDownText->SetText(FText::FromString(CountdownText));
+		GameHUD->PlayerOverlay->MatchCountDownText->SetText(FText::FromString(CountdownText));
+	}
+}
+
+void ADFNPlayerController::SetHUDWarmupCountDown(float WarmupCountDownTime)
+{
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	bool bHUDValid = GameHUD &&
+		GameHUD->AnnouncementOverlay &&
+		GameHUD->AnnouncementOverlay->WarmupTime;
+	if (bHUDValid)
+	{
+		if(WarmupCountDownTime < 0.f)
+		{
+			// If Countdown is negative we don't display it and return;
+			GameHUD->AnnouncementOverlay->WarmupTime->SetText(FText());
+			return;
+		}
+		int32 Minutes = FMath::FloorToInt(WarmupCountDownTime / 60);
+		int32 Seconds = WarmupCountDownTime - Minutes * 60;
+		FString CountdownText = FString::Printf(TEXT("%02d:%02d"), Minutes, Seconds);
+		GameHUD->AnnouncementOverlay->WarmupTime->SetText(FText::FromString(CountdownText));
 	}
 }
 
 void ADFNPlayerController::SetHUDTime()
 {
-	uint32 SecondsLeft = FMath::CeilToInt(MatchTime - GetServerTime());
+	float TimeLeft = 0.f;
+	if(MatchState == MatchState::WaitingToStart) // Timer for Warmup
+		TimeLeft = WarmupTime - GetServerTime() + LevelStartTime;
+	else if (MatchState == MatchState::InProgress)	// Timer for Inprogress
+		TimeLeft = WarmupTime + MatchTime - GetServerTime() + LevelStartTime;
+	else if (MatchState == MatchState::Cooldown) // Timer for CoolDown when match ends
+		TimeLeft = CooldownTime + WarmupTime + MatchTime - GetServerTime() + LevelStartTime; 
+	
+	uint32 SecondsLeft = FMath::CeilToInt(TimeLeft);
 
+	if(HasAuthority())
+	{
+		DFNGameMode = DFNGameMode == nullptr ? Cast<ADFNGameMode>(UGameplayStatics::GetGameMode(this)) : DFNGameMode;
+		if(DFNGameMode)
+		{
+			SecondsLeft = FMath::CeilToInt(DFNGameMode->GetCountdownTime() + LevelStartTime);
+		}
+	}
+	
 	if(CountDownInt != SecondsLeft)
 	{
-		SetHUDMatchCountDown(MatchTime - GetServerTime());
+		if(MatchState == MatchState::WaitingToStart || MatchState == MatchState::Cooldown)
+		{
+			SetHUDWarmupCountDown(TimeLeft);
+		}
+		if(MatchState == MatchState::InProgress)
+		{
+			SetHUDMatchCountDown(TimeLeft);
+		}
 	}
 	CountDownInt = SecondsLeft;
 }
@@ -394,8 +303,7 @@ void ADFNPlayerController::ServerRequestServerTime_Implementation(float TimeofCl
 	ClientReportServerTime(TimeofClientRequest, ServerTimeofReceipt);
 }
 
-void ADFNPlayerController::ClientReportServerTime_Implementation(float TimeofCLientRequest,
-	float TimeServerReceivedClientRequest)
+void ADFNPlayerController::ClientReportServerTime_Implementation(float TimeofCLientRequest,	float TimeServerReceivedClientRequest)
 {
 	float RoundTripTime = GetWorld()->GetTimeSeconds() - TimeofCLientRequest;
 	float CurrentServerTime = TimeServerReceivedClientRequest + (0.5f * RoundTripTime);
@@ -408,10 +316,7 @@ float ADFNPlayerController::GetServerTime()
 	{
 		return GetWorld()->GetTimeSeconds();
 	}
-	else
-	{
-		return GetWorld()->GetTimeSeconds() + ClientServerDelta;
-	}
+	return GetWorld()->GetTimeSeconds() + ClientServerDelta;
 }
 
 void ADFNPlayerController::ReceivedPlayer()
@@ -427,14 +332,13 @@ void ADFNPlayerController::ReceivedPlayer()
 void ADFNPlayerController::OnMatchStateSet(FName State)
 {
 	MatchState = State;
-
 	if(MatchState == MatchState::InProgress)
 	{
-		PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
-		if(PlayerHUD)
-		{
-			PlayerHUD->AddPlayerOverlay();
-		}
+		HandleMatchHasStarted();
+	}
+	else if(MatchState == MatchState::Cooldown)
+	{
+		HandleCooldown();
 	}
 }
 
@@ -442,10 +346,74 @@ void ADFNPlayerController::OnRep_MatchState()
 {
 	if(MatchState == MatchState::InProgress)
 	{
-		PlayerHUD = PlayerHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : PlayerHUD;
-		if(PlayerHUD)
+		HandleMatchHasStarted();
+	}
+	else if(MatchState == MatchState::Cooldown)
+	{
+		HandleCooldown();
+	}
+}
+
+void ADFNPlayerController::HandleMatchHasStarted()
+{
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	if(GameHUD)
+	{
+		GameHUD->AddPlayerOverlay();
+		if(GameHUD->AnnouncementOverlay)
 		{
-			PlayerHUD->AddPlayerOverlay();
+			GameHUD->AnnouncementOverlay->SetVisibility(ESlateVisibility::Hidden);
 		}
+	}
+}
+
+void ADFNPlayerController::HandleCooldown()
+{
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	if(GameHUD)
+	{
+		GameHUD->PlayerOverlay->RemoveFromParent();
+		bool bHUDValid = GameHUD->AnnouncementOverlay && GameHUD->AnnouncementOverlay->AnnouncementText && GameHUD->AnnouncementOverlay->InfoText;
+		if(bHUDValid)
+		{
+			GameHUD->AnnouncementOverlay->SetVisibility(ESlateVisibility::Visible);
+			FString AnnouncementText("New Match starts in: ");
+			GameHUD->AnnouncementOverlay->InfoText->SetText(FText::FromString(AnnouncementText));
+
+			ADFNGameState* DFNGameState = Cast<ADFNGameState>(UGameplayStatics::GetGameState(this));
+			ADFNPlayerState* DFNPlayerState = GetPlayerState<ADFNPlayerState>();
+			if(DFNGameState)
+			{
+				TArray<ADFNPlayerState*> TopScoringPlayers = DFNGameState->TopScoringPlayers;
+				FString InfoTextString;
+				if(TopScoringPlayers.Num() == 0)
+				{
+					InfoTextString = FString("There is no Winner.");
+				}
+				else if(TopScoringPlayers.Num() == 1 && TopScoringPlayers[0] == DFNPlayerState)
+				{
+					InfoTextString = FString("You are the Winner!");
+				}
+				else if(TopScoringPlayers.Num() == 1)
+				{
+					InfoTextString = FString::Printf(TEXT("WINNER \n%s"), *TopScoringPlayers[0]->GetPlayerName());
+				}
+				else if(TopScoringPlayers.Num() > 1)
+				{
+					InfoTextString = FString("Tied Game!\n");
+					for (auto TiedPlayer : TopScoringPlayers)
+					{
+						InfoTextString.Append(FString::Printf(TEXT("%s\n"), *TiedPlayer->GetPlayerName()));
+					}
+				}
+				GameHUD->AnnouncementOverlay->InfoText->SetText(FText::FromString(InfoTextString));
+			}
+		}
+	}
+	DFNCharacter = Cast<ADFNCharacter>(GetPawn());
+	if(DFNCharacter && DFNCharacter->GetCombatComponent())
+	{
+		DFNCharacter->bDisableGameplay = true;
+		DFNCharacter->GetCombatComponent()->FireButtonPressed(false);
 	}
 }

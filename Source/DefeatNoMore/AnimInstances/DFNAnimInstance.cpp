@@ -2,6 +2,8 @@
 
 #include "DFNAnimInstance.h"
 
+#include "Components/SkeletalMeshComponent.h"
+
 #include "DefeatNoMore/Character/DFNCharacter.h"
 
 #include "GameFramework/CharacterMovementComponent.h"
@@ -70,6 +72,6 @@ void UDFNAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		}
 	}
 	bUseFrabrik = DFNCharacter->GetCombatState() != ECombatState::ECS_Reloading;
-	bUseAimOffsets = DFNCharacter->GetCombatState() != ECombatState::ECS_Reloading;
-	bTransformRightHand = DFNCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bUseAimOffsets = DFNCharacter->GetCombatState() != ECombatState::ECS_Reloading && !DFNCharacter->GetDisableGameplay();
+	bTransformRightHand = DFNCharacter->GetCombatState() != ECombatState::ECS_Reloading && !DFNCharacter->GetDisableGameplay();
 }

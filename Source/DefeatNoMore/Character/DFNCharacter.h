@@ -1,6 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InputActionValue.h"
+
 #include "GameFramework/Character.h"
 #include "Camera/CameraActor.h"
 #include "Components/TimelineComponent.h"
@@ -12,10 +14,12 @@
 #include "DefeatNoMore/Interfaces/InterfaceCrosshairInteraction.h"
 #include "DFNCharacter.generated.h"
 
-class UInputMappingContext;
 class AWeapon;
 class UCombatComponent;
 class UAnimMontage;
+
+class UInputMappingContext;
+class UInputAction;
 
 UCLASS()
 class DEFEATNOMORE_API ADFNCharacter : public ACharacter, public IInterfaceCrosshairInteraction
@@ -26,36 +30,58 @@ class DEFEATNOMORE_API ADFNCharacter : public ACharacter, public IInterfaceCross
 public:
 	ADFNCharacter();
 	virtual void Tick(float DeltaSeconds) override;
-	
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PostInitializeComponents() override;
-	virtual void OnRep_ReplicatedMovement() override;
+	virtual void PossessedBy(AController* NewController) override;
+
+	
 	void PlayFireMontage(bool bFiring);
 	void PlayReloadMontage() const;
 
+	virtual void OnRep_ReplicatedMovement() override;
+	
 	// Eliminations 
 	void Elimination();
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastElimination();
 	void PlayEliminationMontage();
 
-	virtual void Jump() override;
 
+	/* Weapon Equipping */
 	void SetOverlappingWeapon(AWeapon* Weapon);
 	AWeapon* GetEquippedWeapon() const;
+	/* -- */
 	
 	UPROPERTY(Replicated)
 	bool bWalking;
 	
-	// call AimButtonPressed on CombatComponent, responsible for handling all combat actions 
-	void AimButtonPressed() const;
-	void AimButtonReleased();
-	// calll FireButtonPressed on CombatComponent, responsible for handling all combat actions 
-	void FireButtonPressed() const;
-	void FireButtonReleased() const;
+	UPROPERTY(Replicated)
+	bool bDisableGameplay = false;
 
 protected:
 	virtual void BeginPlay() override;
+	
+	// Input calls
+	void Move(const FInputActionValue& Value);
+	void Look(const FInputActionValue& Value);
+	virtual void Jump() override;
+	void CharacterStopJumping(); // we`ll call the character`s stopJump() method;
+	void CrouchPressed();
+	void WalkPressed();
+	void WalkReleased();
+	void AimButtonPressed();	// call AimButtonPressed on CombatComponent, responsible for handling all combat actions 
+	void AimButtonReleased();
+	void FireButtonPressed();	// calll FireButtonPressed on CombatComponent, responsible for handling all combat actions 
+	void FireButtonReleased();
+	void ReloadButtonPressed();
+
+	// calls ServerWalkPressed, which set variables that are already replicated on CharacterMovementComponent.
+	UFUNCTION(Server, Unreliable)
+	void ServerWalkPressed();
+	UFUNCTION(Server, Unreliable)
+	void ServerWalkReleased();
+
 
 	// Weapon being overlapped bu our character
 	UPROPERTY(Replicated)
@@ -71,14 +97,42 @@ protected:
 	void SimProxiesTurn();
 	
 	void PlayHitReactMontage() const;
-
+	
 	UFUNCTION()
 	void ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCauser);
 	void UpdateHUDHealth();
 	// Poll for any relelvant classes and initialize our HUD
 	void PollInit();
+	void RotateInPlace(float DeltaSeconds);
 	
 private:
+
+	/*------------------INPUT------------------*/
+	/* MappingContext */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	UInputMappingContext* DefaultMappingContext;
+
+	/** Actions */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	UInputAction* JumpAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	UInputAction* MoveAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	UInputAction* WalkAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* LookAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* CrouchAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* AimAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* FireAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ReloadAction;
+	/* ------------ END INPUT ---------------*/
+	
+
+	
 	
 	// SpringArm(cameraBoom) and Camera
 	UPROPERTY(EditDefaultsOnly, Category = SpringArm)
@@ -134,6 +188,9 @@ private:
 	
 	UPROPERTY(EditAnywhere, Category = Combat)
 	UAnimMontage* DeathMontage;
+
+	UPROPERTY(EditAnywhere, Category = Combat)
+	UAnimMontage* EquipWeaponMontage;
 
 	bool bRotateRootBone;
 	float TurnThreshHold = 0.1f;
@@ -197,6 +254,8 @@ public:
 	FORCEINLINE UCameraComponent* GetThirdPersonCamera() const { return ThirdPersonCamera; }
 	FORCEINLINE UCombatComponent* GetCombatComponent() const { return CombatComp; }
 
+	FORCEINLINE bool GetDisableGameplay() { return bDisableGameplay; }
+	
 	ECombatState GetCombatState() const;
 	
 	FVector GetHitTarget() const;

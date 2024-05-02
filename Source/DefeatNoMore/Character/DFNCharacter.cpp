@@ -1,7 +1,15 @@
 #include "DFNCharacter.h"
 
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "TimerManager.h"
+
+#include "Animation/AnimInstance.h"
+
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
@@ -11,6 +19,10 @@
 #include "DefeatNoMore/DefeatNoMore.h"
 #include "DefeatNoMore/GameModes/DFNGameMode.h"
 #include "DefeatNoMore/PlayerController/DFNPlayerController.h"
+
+#include "Engine/LocalPlayer.h"
+
+#include "Materials/MaterialInstanceDynamic.h"
 
 ADFNCharacter::ADFNCharacter()
 {
@@ -53,6 +65,7 @@ void ADFNCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(ADFNCharacter, bWalking);
 	DOREPLIFETIME(ADFNCharacter, bIsFiring);
 	DOREPLIFETIME(ADFNCharacter, Health);
+	DOREPLIFETIME(ADFNCharacter, bDisableGameplay); // disabling actions when needed
 }
 
 void ADFNCharacter::PostInitializeComponents()
@@ -65,10 +78,35 @@ void ADFNCharacter::PostInitializeComponents()
 	}
 }
 
+void ADFNCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	
+	if(ADFNPlayerController* PC = Cast<ADFNPlayerController>(GetController()))
+	{
+		/* Mapping Input*/
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Beginplay - Subsystem is valid!"));
+			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
+	}
+}
+
 void ADFNCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if(ADFNPlayerController* PC = Cast<ADFNPlayerController>(GetController()))
+	{
+		/* Mapping Input*/
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Beginplay - Subsystem is valid!"));
+			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
+	}
+	
 	if(HasAuthority())
 	{
 		OnTakeAnyDamage.AddDynamic(this, &ADFNCharacter::ReceiveDamage);
@@ -79,17 +117,150 @@ void ADFNCharacter::BeginPlay()
 void ADFNCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	AimOffset(DeltaSeconds);
+	
+	RotateInPlace(DeltaSeconds);
 	PollInit();
+}
+
+void ADFNCharacter::RotateInPlace(float DeltaSeconds)
+{
+	if(bDisableGameplay)
+	{
+		bUseControllerRotationYaw = false;
+		TurningInPlace = ETurnInPlace::ETIP_NotTurning;
+		return;
+	}
+	if(GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled())
+	{
+		AimOffset(DeltaSeconds);
+	}
+	else
+	{
+		TimeSinceLastMovementReplication += DeltaSeconds;
+		if(TimeSinceLastMovementReplication> 0.05f)
+		{
+			OnRep_ReplicatedMovement();
+		}
+		CalculateAO_Pitch();
+	}
+}
+
+void ADFNCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	if(UEnhancedInputComponent* EIC = CastChecked<UEnhancedInputComponent>(InputComponent))
+	{
+		//Jump
+		EIC->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ADFNCharacter::Jump);
+		EIC->BindAction(JumpAction, ETriggerEvent::Completed, this, &ADFNCharacter::CharacterStopJumping);
+		//Move
+		EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ADFNCharacter::Move);
+		// Walk (not running / no footstep sounds)
+		EIC->BindAction(WalkAction, ETriggerEvent::Triggered, this, &ADFNCharacter::WalkPressed);
+		EIC->BindAction(WalkAction, ETriggerEvent::Completed, this, &ADFNCharacter::WalkReleased);
+		//Look
+		EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &ADFNCharacter::Look);
+		//Crouch
+		EIC->BindAction(CrouchAction, ETriggerEvent::Started, this, &ADFNCharacter::CrouchPressed);
+		// Aim - ZoomFOV
+		EIC->BindAction(AimAction, ETriggerEvent::Triggered, this, &ADFNCharacter::AimButtonPressed);
+		EIC->BindAction(AimAction, ETriggerEvent::Completed, this, &ADFNCharacter::AimButtonReleased);
+		//Fire
+		EIC->BindAction(FireAction, ETriggerEvent::Started, this, &ADFNCharacter::FireButtonPressed);
+		EIC->BindAction(FireAction, ETriggerEvent::Completed, this, &ADFNCharacter::FireButtonReleased);
+		//Reload
+		EIC->BindAction(ReloadAction, ETriggerEvent::Started, this, &ADFNCharacter::ReloadButtonPressed);
+	}
+}
+
+void ADFNCharacter::Move(const FInputActionValue& Value)
+{
+	if(bDisableGameplay) return;
+	
+	// AddMovementInput takes a Vector
+	const FVector2d MovementVector = Value.Get<FVector2d>();
+	AddMovementInput(GetActorForwardVector(), MovementVector.Y);
+	AddMovementInput(GetActorRightVector(), MovementVector.X);
+}
+
+void ADFNCharacter::Look(const FInputActionValue& Value)
+{
+	// AddControllerPitchInput takes a Vector
+	const FVector2d LookAxisVector = Value.Get<FVector2d>();
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if(PC)
+	{
+		PC->AddPitchInput(LookAxisVector.Y);
+	}
+	AddControllerYawInput(LookAxisVector.X);
 }
 
 void ADFNCharacter::Jump()
 {
+	if(bDisableGameplay) return;
 	if(bIsCrouched)
 	{
 		UnCrouch();
 	}
 	Super::Jump();
+}
+
+void ADFNCharacter::CharacterStopJumping()
+{
+	StopJumping();
+}
+
+void ADFNCharacter::CrouchPressed()
+{
+	if(bDisableGameplay) return;
+	if(bIsCrouched)
+	{
+		UnCrouch();
+	}
+	Crouch();
+}
+
+void ADFNCharacter::WalkPressed()
+{
+	if(IsLocallyControlled())
+	{
+		ServerWalkPressed();
+	}
+	bWalking = true;
+	GetCharacterMovement()->MaxWalkSpeed = 220.f;
+}
+
+void ADFNCharacter::WalkReleased()
+{
+	if(IsLocallyControlled())
+	{
+		ServerWalkReleased();
+	}
+	bWalking = false;
+	GetCharacterMovement()->MaxWalkSpeed = 420.f;
+}
+
+void ADFNCharacter::ServerWalkPressed_Implementation()
+{
+	bWalking = true;
+	GetCharacterMovement()->MaxWalkSpeed = 220.f;
+}
+
+void ADFNCharacter::ServerWalkReleased_Implementation()
+{
+	bWalking = false;
+	GetCharacterMovement()->MaxWalkSpeed = 420.f;
+}
+
+void ADFNCharacter::ReloadButtonPressed()
+{
+	if(bDisableGameplay) return;
+	if(GetCombatComponent())
+	{
+		GetCombatComponent()->Reload();
+	}
 }
 
 float ADFNCharacter::CalculateSpeed() const
@@ -115,23 +286,24 @@ void ADFNCharacter::AimOffset(float DeltaSeconds)
 	if(Speed == 0.f && !bIsInAir)
 	{
 		bRotateRootBone = true;
-		
 		const FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
-		const FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(StartingAimRotation, CurrentAimRotation);
+		const FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StartingAimRotation);
 		AO_Yaw = DeltaAimRotation.Yaw;
 		if (TurningInPlace == ETurnInPlace::ETIP_NotTurning)
 		{
 			InterpAO_Yaw = AO_Yaw;
 		}
+		bUseControllerRotationYaw = true;
+		TurnInPlace(DeltaSeconds);
 	}
 	if (Speed > 0.f || bIsInAir) // running, or jumping
 	{
 		bRotateRootBone = false;
 		StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
 		AO_Yaw = 0.f;
+		bUseControllerRotationYaw = true;
 		TurningInPlace = ETurnInPlace::ETIP_NotTurning;
 	}
-
 	TurnInPlace(DeltaSeconds);
 	// Pitch
 	CalculateAO_Pitch();
@@ -258,8 +430,9 @@ AWeapon* ADFNCharacter::GetEquippedWeapon() const
 	return CombatComp->EquippedWeapon;
 }
 
-void ADFNCharacter::AimButtonPressed() const
+void ADFNCharacter::AimButtonPressed()
 {
+	if(bDisableGameplay) return;
 	if(CombatComp)
 	{
 		CombatComp->SetAiming(true);
@@ -268,6 +441,7 @@ void ADFNCharacter::AimButtonPressed() const
 
 void ADFNCharacter::AimButtonReleased()
 {
+	if(bDisableGameplay) return;
 	if(CombatComp)
 	{
 		CombatComp->SetAiming(false);
@@ -278,16 +452,18 @@ bool ADFNCharacter::bIsAiming() const
 {
 	return (CombatComp && CombatComp->bAiming);	
 }
-void ADFNCharacter::FireButtonPressed() const
+void ADFNCharacter::FireButtonPressed()
 {
+	if(bDisableGameplay) return;
 	if(CombatComp)
 	{
 		CombatComp->FireButtonPressed(true);
 	}
 }
 
-void ADFNCharacter::FireButtonReleased() const
+void ADFNCharacter::FireButtonReleased()
 {
+	if(bDisableGameplay) return;
 	if(CombatComp)
 	{
 		CombatComp->FireButtonPressed(false);
@@ -393,10 +569,13 @@ void ADFNCharacter::MulticastElimination_Implementation()
 	StartDissolve();
 	GetCharacterMovement()->DisableMovement();
 	GetCharacterMovement()->StopMovementImmediately();
-	if(DFNPlayerController)
+
+	bDisableGameplay = true;
+	if(CombatComp)
 	{
-		DisableInput(DFNPlayerController);
+		CombatComp->FireButtonPressed(false);
 	}
+	
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }

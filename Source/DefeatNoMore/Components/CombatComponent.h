@@ -35,6 +35,10 @@ public:
 	void Reload();
 	UFUNCTION(BlueprintCallable)
 	void FinishReloading();
+	
+	// FireButtonPressed calls ServerFire in order to fire weapons
+	void FireButtonPressed(bool bPressed);
+	
 protected:
 	virtual void BeginPlay() override;
 
@@ -42,9 +46,6 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerSetAiming(bool bIsAiming);
-	
-	// FireButtonPressed calls ServerFire in order to fire weapons
-	void FireButtonPressed(bool bPressed);
 	
 	/**
 	 * @brief Server Fire calls MulticastFire, so it's replicated to all clients. From server to client

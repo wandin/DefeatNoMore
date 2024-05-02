@@ -6,9 +6,15 @@
 #include "Kismet/GameplayStatics.h"
 #include "DefeatNoMore/PlayerState/DFNPlayerState.h"
 #include "DefeatNoMore/Character/DFNCharacter.h"
+#include "DefeatNoMore/GameStates/DFNGameState.h"
 #include "DefeatNoMore/PlayerController/DFNPlayerController.h"
 
 #include "Engine/World.h"
+
+namespace  MatchState
+{
+	const FName Cooldown = FName("Cooldown");
+}
 
 ADFNGameMode::ADFNGameMode()
 {
@@ -49,6 +55,22 @@ void ADFNGameMode::Tick(float DeltaSeconds)
 			StartMatch();
 		}
 	}
+	else if(MatchState == MatchState::InProgress)
+	{
+		CountDownTime = WarmupTime + MatchTime - GetWorld()->GetTimeSeconds() + LevelStartingTime;
+		if(CountDownTime <= 0.f)
+		{
+			SetMatchState(MatchState::Cooldown);
+		}
+	}
+	else if(MatchState == MatchState::Cooldown)
+	{
+		CountDownTime = CooldownTime + WarmupTime + MatchTime - GetWorld()->GetTimeSeconds() + LevelStartingTime;
+		if(CountDownTime <= 0.f)
+		{
+			RestartGame();
+		}
+	}
 }
 
 void ADFNGameMode::PlayerEliminated(ADFNCharacter* ElimmedCharacter, ADFNPlayerController* VictimController,
@@ -59,9 +81,12 @@ void ADFNGameMode::PlayerEliminated(ADFNCharacter* ElimmedCharacter, ADFNPlayerC
 	ADFNPlayerState* AttackerPlayerState = AttackerController ? Cast<ADFNPlayerState>(AttackerController->PlayerState) : nullptr;
 	ADFNPlayerState* VictimPlayerState = VictimController ? Cast<ADFNPlayerState>(VictimController->PlayerState) : nullptr;
 
-	if (AttackerPlayerState && AttackerPlayerState != VictimPlayerState)
+	ADFNGameState* DFNGameState = GetGameState<ADFNGameState>();
+
+	if (AttackerPlayerState && AttackerPlayerState != VictimPlayerState && DFNGameState)
 	{
 		AttackerPlayerState->AddToScore(1.f);
+		DFNGameState->UpdateTopScore(AttackerPlayerState);
 	}
 	if (VictimPlayerState)
 	{
