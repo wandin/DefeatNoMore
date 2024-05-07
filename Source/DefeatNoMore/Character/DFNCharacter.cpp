@@ -556,7 +556,6 @@ void ADFNCharacter::MulticastElimination_Implementation()
 	{
 		DFNPlayerController->UpdateHUDWeaponAmmo(0); // reset ammo!
 	}
-	
 	bEliminated = true;
 	PlayEliminationMontage();
 	if(DissolveMaterialInstance)

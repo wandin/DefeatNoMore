@@ -7,14 +7,17 @@
 #include "DefeatNoMore/Weapons/Weapon.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
-#include "DrawDebugHelpers.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "DefeatNoMore/PlayerController/DFNPlayerController.h"
 #include "DefeatNoMore/HUD/DFNHUD.h"
 #include "TimerManager.h"
 
+#include "Components/SkeletalMeshComponent.h"
+
 #include "DefeatNoMore/Enums/WeaponTypes.h"
+
+#include "Engine/GameViewportClient.h"
 
 #include "Sound/SoundCue.h"
 
@@ -353,7 +356,8 @@ void UCombatComponent::OnRep_CarriedAmmo()
 void UCombatComponent::InitializeCarriedAmmo()
 {
 	//Initializing Ammo for each weapon type
-	CarriedAmmoMap.Emplace(EWeaponType::EWT_AssaultRifle, StartingAmmoAR);
+	CarriedAmmoMap.Emplace(EWeaponType::EWT_AssaultRifle, StartingAssaultRifleAmmo);
+	CarriedAmmoMap.Emplace(EWeaponType::EWT_RocketLauncher, StartingRocketAmmo);
 }
 
 void UCombatComponent::StartFireTimer()

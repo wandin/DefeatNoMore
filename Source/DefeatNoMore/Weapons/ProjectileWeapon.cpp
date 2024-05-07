@@ -2,9 +2,14 @@
 
 #include "ProjectileWeapon.h"
 
-#include "Engine/SkeletalMeshSocket.h"
-#include "DefeatNoMore/Projectiles/Projectile.h"
+#include "Components/SkeletalMeshComponent.h"
 
+#include "Engine/SkeletalMeshSocket.h"
+#include "DefeatNoMore/Weapons/Projectiles/Projectile.h"
+
+#include "Engine/World.h"
+
+#include "GameFramework/Pawn.h"
 
 
 void AProjectileWeapon::Fire(const FVector& HitTarget)
@@ -33,7 +38,7 @@ void AProjectileWeapon::Fire(const FVector& HitTarget)
 			UWorld* World = GetWorld();
 			if(World)
 			{
-				//Spawn Actor at tip of barrel
+				//Spawn Actor
 				World->SpawnActor<AProjectile>(ProjectileCLass, SocketTransform.GetLocation(), TargetRotation, SpawnParams);
 			}
 		}

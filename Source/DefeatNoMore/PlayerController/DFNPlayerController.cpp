@@ -359,7 +359,10 @@ void ADFNPlayerController::HandleMatchHasStarted()
 	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
 	if(GameHUD)
 	{
-		GameHUD->AddPlayerOverlay();
+		if(!GameHUD->PlayerOverlay)
+		{
+			GameHUD->AddPlayerOverlay();
+		}
 		if(GameHUD->AnnouncementOverlay)
 		{
 			GameHUD->AnnouncementOverlay->SetVisibility(ESlateVisibility::Hidden);
