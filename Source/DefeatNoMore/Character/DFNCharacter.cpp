@@ -28,16 +28,14 @@ ADFNCharacter::ADFNCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("Spring Arm"));
-	SpringArm->SetupAttachment(GetMesh(), FName("head"));
-	const FVector SpringArmLocation(5.f, 18.f, 0.f);
-	const FRotator SpringArmRotation(0.f, 90.f, -90.f);
-	SpringArm->SetRelativeLocationAndRotation(SpringArmLocation, SpringArmRotation);
-	SpringArm->SetRelativeLocationAndRotation(SpringArmLocation, SpringArmRotation);
+	SpringArm->SetupAttachment(GetMesh());
+	SpringArm->TargetArmLength = 600.f;
+	SpringArm->bUsePawnControlRotation = true;
 	
 	// First Person camera - attached to mesh(head socket), location and rotation set.
-	ThirdPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	ThirdPersonCamera->AttachToComponent(SpringArm, FAttachmentTransformRules::KeepRelativeTransform);
-	ThirdPersonCamera->bUsePawnControlRotation = true;
+	ThirdPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("ThirdPersonCamera"));
+	ThirdPersonCamera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
+	ThirdPersonCamera->bUsePawnControlRotation = false;
 	
 	//CombatComponent
 	CombatComp = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
@@ -50,7 +48,7 @@ ADFNCharacter::ADFNCharacter()
 	GetMesh()->SetCollisionObjectType(ECC_SkeletalMesh);
 	GetMesh()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-	GetCharacterMovement()->bOrientRotationToMovement = false;	
+	GetCharacterMovement()->bOrientRotationToMovement = true;
 	
 	NetUpdateFrequency = 128.f;
 	MinNetUpdateFrequency = 64.f;
@@ -283,7 +281,7 @@ void ADFNCharacter::AimOffset(float DeltaSeconds)
 	const bool bIsInAir = GetCharacterMovement()->IsFalling();
 	
 	//	Yaw
-	if(Speed == 0.f && !bIsInAir)
+	if(Speed > 0.f && !bIsInAir)
 	{
 		bRotateRootBone = true;
 		const FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
@@ -396,9 +394,9 @@ void ADFNCharacter::TurnInPlace(float DeltaSeconds)
 	}
 	if (TurningInPlace != ETurnInPlace::ETIP_NotTurning)
 	{
-		InterpAO_Yaw = FMath::FInterpTo(InterpAO_Yaw, 0.f, DeltaSeconds, 4.f);
+		InterpAO_Yaw = FMath::FInterpTo(InterpAO_Yaw, 0.f, DeltaSeconds, 3.f);
 		AO_Yaw = InterpAO_Yaw;
-		if (FMath::Abs(AO_Yaw) < 15.f)
+		if (AO_Yaw < 15.f)
 		{
 			TurningInPlace = ETurnInPlace::ETIP_NotTurning;
 			StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);

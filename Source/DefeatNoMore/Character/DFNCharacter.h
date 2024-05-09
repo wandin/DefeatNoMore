@@ -50,6 +50,7 @@ public:
 
 	/* Weapon Equipping */
 	void SetOverlappingWeapon(AWeapon* Weapon);
+	void EquipWeapon(AWeapon* Weapon);
 	AWeapon* GetEquippedWeapon() const;
 	/* -- */
 	
@@ -130,8 +131,6 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ReloadAction;
 	/* ------------ END INPUT ---------------*/
-	
-
 	
 	
 	// SpringArm(cameraBoom) and Camera

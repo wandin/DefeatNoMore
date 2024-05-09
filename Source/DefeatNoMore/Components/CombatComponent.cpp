@@ -163,8 +163,11 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaSeconds)
 
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 {
-	if(DFNCharacter == nullptr || WeaponToEquip == nullptr) return;
-
+	if(DFNCharacter == nullptr || WeaponToEquip == nullptr)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("INVALID WEAPONTOEQUIP"));
+		return;
+	}
 	if(IsWeaponEquipped()) return; // returns if a weapon is already equipped
 
 	if(EquippedWeapon)
@@ -468,7 +471,6 @@ void UCombatComponent::HandleReload()
 {
 	DFNCharacter->PlayReloadMontage();
 }
-
 
 int32 UCombatComponent::AmountToReload()
 {

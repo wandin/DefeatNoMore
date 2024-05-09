@@ -28,6 +28,7 @@ void AProjectileWeapon::Fire(const FVector& HitTarget)
 		// Socket transform
 		FTransform SocketTransform = MuzzleFlashSocket->GetSocketTransform(GetWeaponMesh());
 		// we'll get our projectile direction from this ToTarget vector
+		// FIX THIS TO TARGET CALCULATION! - WANDERSON
 		const FVector ToTarget = HitTarget - SocketTransform.GetLocation(); // From MuzzleFlashSocket to hit location - doing it on TraceUnderCrosshairs function
 		FRotator TargetRotation = ToTarget.Rotation(); // our Projectile Direction as mentioned prior
 		if(ProjectileCLass && InstigatorPawn)

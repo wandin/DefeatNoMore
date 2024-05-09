@@ -71,9 +71,9 @@ void AProjectile::Destroyed()
 	Super::Destroyed();
 
 	if(ImpactParticles) // Spawn our ImpactParticles
-		{
+	{
 		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, GetActorTransform());
-		}
+	}
 	if(ImpactSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, GetActorLocation());

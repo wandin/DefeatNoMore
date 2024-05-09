@@ -4,6 +4,8 @@
 #include "ProjectileBullet.h"
 
 #include "GameFramework/Character.h"
+#include "GameFramework/DamageType.h"
+
 #include "Kismet/GameplayStatics.h"
 
 void AProjectileBullet::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
@@ -13,11 +15,10 @@ void AProjectileBullet::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 	if(OwnerCharacter)
 	{
 		AController* OwnerController = OwnerCharacter->GetController();
-		if(OwnerController)
+		if(OwnerController && OtherActor != OwnerCharacter)
 		{
 			UGameplayStatics::ApplyDamage(OtherActor, Damage, OwnerController, this, UDamageType::StaticClass());
 		}
 	}
-	
 	Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit);
 }
