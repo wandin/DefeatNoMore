@@ -494,7 +494,16 @@ void ADFNCharacter::PlayReloadMontage() const
 
 		switch (CombatComp->EquippedWeapon->GetWeaponType())
 		{
+		case EWeaponType::EWT_Pistol:
+			SectionName = FName("Rifle");
+			break;
+		case EWeaponType::EWT_SMG:
+			SectionName = FName("Rifle");
+			break;
 		case EWeaponType::EWT_AssaultRifle:
+			SectionName = FName("Rifle");
+			break;
+		case EWeaponType::EWT_RocketLauncher:
 			SectionName = FName("Rifle");
 			break;
 		default: ;
@@ -558,6 +567,8 @@ void ADFNCharacter::MulticastElimination_Implementation()
 	}
 	bEliminated = true;
 	PlayEliminationMontage();
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->StopMovementImmediately();
 	if(DissolveMaterialInstance)
 	{
 		DynamicDissolveMaterialInstance = UMaterialInstanceDynamic::Create(DissolveMaterialInstance, this);
@@ -566,15 +577,11 @@ void ADFNCharacter::MulticastElimination_Implementation()
 		DynamicDissolveMaterialInstance->SetScalarParameterValue(TEXT("Glow"), 200.f);
 	}
 	StartDissolve();
-	GetCharacterMovement()->DisableMovement();
-	GetCharacterMovement()->StopMovementImmediately();
-
 	bDisableGameplay = true;
 	if(CombatComp)
 	{
 		CombatComp->FireButtonPressed(false);
 	}
-	
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }

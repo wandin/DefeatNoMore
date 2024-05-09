@@ -44,7 +44,7 @@ public:
 	void SetHUDAmmo();
 	void SetHUDWeaponImage();
 	
-	// we are overriding Fire in ProjectileWeapon
+	// we are overriding Fire in Derived classes
 	virtual void Fire(const FVector& HitTarget);
 	void DropWeapon();
 	void AddAmmo(int32 AmmoToAdd);
