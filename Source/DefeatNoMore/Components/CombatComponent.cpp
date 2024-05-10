@@ -168,7 +168,7 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 		UE_LOG(LogTemp, Warning, TEXT("INVALID WEAPONTOEQUIP"));
 		return;
 	}
-	if(IsWeaponEquipped()) return; // returns if a weapon is already equipped
+	//if(IsWeaponEquipped()) return; // returns if a weapon is already equipped
 
 	if(EquippedWeapon)
 	{

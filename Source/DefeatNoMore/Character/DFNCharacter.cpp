@@ -161,6 +161,8 @@ void ADFNCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 		EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &ADFNCharacter::Look);
 		//Crouch
 		EIC->BindAction(CrouchAction, ETriggerEvent::Started, this, &ADFNCharacter::CrouchPressed);
+		//Equip
+		EIC->BindAction(EquipAction, ETriggerEvent::Triggered, this, &ADFNCharacter::EquipButtonPressed);
 		// Aim - ZoomFOV
 		EIC->BindAction(AimAction, ETriggerEvent::Triggered, this, &ADFNCharacter::AimButtonPressed);
 		EIC->BindAction(AimAction, ETriggerEvent::Completed, this, &ADFNCharacter::AimButtonReleased);
@@ -238,6 +240,30 @@ void ADFNCharacter::WalkReleased()
 	}
 	bWalking = false;
 	GetCharacterMovement()->MaxWalkSpeed = 420.f;
+}
+
+void ADFNCharacter::EquipButtonPressed()
+{
+	if (bDisableGameplay) return;
+	if (CombatComp)
+	{
+		if (HasAuthority())
+		{
+			CombatComp->EquipWeapon(OverlappingWeapon);
+		}
+		else
+		{
+			ServerEquipButtonPressed();
+		}
+	}
+}
+
+void ADFNCharacter::ServerEquipButtonPressed_Implementation()
+{
+	if(CombatComp)
+	{
+		CombatComp->EquipWeapon(OverlappingWeapon);
+	}
 }
 
 void ADFNCharacter::ServerWalkPressed_Implementation()
@@ -407,15 +433,19 @@ void ADFNCharacter::TurnInPlace(float DeltaSeconds)
 void ADFNCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 {
 	OverlappingWeapon = Weapon;
+
+	if(!CombatComp || CombatComp->EquippedWeapon) return; // if CombatComp not valid, or we already have a EquippedWeapon return
+
+	// Otherwise we Equip a weapon just by simply overlapping it.
 	if(IsLocallyControlled() && HasAuthority())
 	{
-		if(OverlappingWeapon && CombatComp)
+		if(OverlappingWeapon)
 		{
 			// Equip Weapon
 			EquipWeaponOnCombatComponent();
 		}
 	}
-	if(OverlappingWeapon && CombatComp)
+	if(OverlappingWeapon)
 	{
 		// Equip Weapon
 		ServerEquipWeaponOnCombatComponent();

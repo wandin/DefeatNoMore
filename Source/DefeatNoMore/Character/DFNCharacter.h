@@ -71,6 +71,7 @@ protected:
 	void CrouchPressed();
 	void WalkPressed();
 	void WalkReleased();
+	void EquipButtonPressed();
 	void AimButtonPressed();	// call AimButtonPressed on CombatComponent, responsible for handling all combat actions 
 	void AimButtonReleased();
 	void FireButtonPressed();	// calll FireButtonPressed on CombatComponent, responsible for handling all combat actions 
@@ -125,6 +126,8 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* CrouchAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* EquipAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* AimAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* FireAction;
@@ -142,7 +145,10 @@ private:
 	// CombatComponent, handles all of ours combat actions
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UCombatComponent* CombatComp;
-		
+
+	UFUNCTION(Server, Reliable)
+	void ServerEquipButtonPressed();
+	
 	// Equip weapons, call ServerEquipWeapons on out CombatComponent, to be replicated
 	void EquipWeaponOnCombatComponent();
 	void ServerEquipWeaponOnCombatComponent();
