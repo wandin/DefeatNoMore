@@ -168,8 +168,6 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 		UE_LOG(LogTemp, Warning, TEXT("INVALID WEAPONTOEQUIP"));
 		return;
 	}
-	//if(IsWeaponEquipped()) return; // returns if a weapon is already equipped
-
 	if(EquippedWeapon)
 	{
 		EquippedWeapon->DropWeapon(); // drop weapon before equipping a new one!
@@ -185,7 +183,6 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	EquippedWeapon->SetOwner(DFNCharacter);
 	EquippedWeapon->SetHUDAmmo();
 	EquippedWeapon->SetHUDWeaponImage();
-	bIsWeaponEquipped = true;
 
 	// replicated
 	if(CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
@@ -227,11 +224,6 @@ void UCombatComponent::OnRep_EquippedWeapon()
 			UGameplayStatics::PlaySoundAtLocation(this, EquippedWeapon->EquipSound, DFNCharacter->GetActorLocation());
 		}
 	}
-}
-
-bool UCombatComponent::IsWeaponEquipped() const
-{
-	return bIsWeaponEquipped;
 }
 
 void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)

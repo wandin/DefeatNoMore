@@ -88,9 +88,6 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
 	AWeapon* EquippedWeapon;
 
-	bool bIsWeaponEquipped;
-	bool IsWeaponEquipped() const;
-
 	UPROPERTY(EditAnywhere)
 	float BaseWalkSpeed;
 	
