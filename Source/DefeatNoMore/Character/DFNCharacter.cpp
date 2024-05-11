@@ -29,12 +29,13 @@ ADFNCharacter::ADFNCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("Spring Arm"));
 	SpringArm->SetupAttachment(GetMesh());
-	SpringArm->TargetArmLength = 600.f;
+	SpringArm->TargetArmLength = 200.f;
 	SpringArm->bUsePawnControlRotation = true;
 	
 	// First Person camera - attached to mesh(head socket), location and rotation set.
 	ThirdPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("ThirdPersonCamera"));
 	ThirdPersonCamera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
+	ThirdPersonCamera->SetRelativeRotation(FRotator(0.f, 340.f, 0.f));
 	ThirdPersonCamera->bUsePawnControlRotation = false;
 	
 	//CombatComponent

@@ -38,4 +38,21 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	USoundCue* ImpactSound;
+
+
+	/* Trace end With Spread */
+
+	UPROPERTY(EditAnywhere, Category = "Weapon Spread")
+	float DistanceToSphere = 800.f;
+
+	UPROPERTY(EditAnywhere, Category = "Weapon Spread")
+	float SphereRadius = 75.f;
+
+	UPROPERTY(EditAnywhere, Category = "Weapon Spread")
+	bool bUseSpread = false;
+	
+
+protected:
+
+	FVector TraceSpread(const FVector& TraceStart, const FVector& HitTarget);
 };

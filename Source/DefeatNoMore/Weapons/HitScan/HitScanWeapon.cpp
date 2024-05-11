@@ -3,6 +3,8 @@
 
 #include "DefeatNoMore/Weapons/HitScan/HitScanWeapon.h"
 
+#include "DrawDebugHelpers.h"
+
 #include "Components/SkeletalMeshComponent.h"
 
 #include "DefeatNoMore/Character/DFNCharacter.h"
@@ -13,6 +15,7 @@
 #include "GameFramework/DamageType.h"
 
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
 
 #include "Particles/ParticleSystem.h"
 #include "Particles/ParticleSystemComponent.h"
@@ -78,4 +81,18 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 			UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
 		}
 	}
+}
+
+FVector AHitScanWeapon::TraceSpread(const FVector& TraceStart, const FVector& HitTarget)
+{
+	FVector ToTargetNormalized = (HitTarget - TraceStart).GetSafeNormal();
+	FVector SphereCenter = TraceStart + ToTargetNormalized * DistanceToSphere;
+	FVector RandVector = UKismetMathLibrary::RandomUnitVector() * FMath::FRandRange(0.f, SphereRadius);
+	FVector EndLocation = SphereCenter + RandVector;
+	FVector ToEndLocation = EndLocation - TraceStart;
+	DrawDebugSphere(GetWorld(), SphereCenter, SphereRadius, 12, FColor::Red, true);
+
+	DrawDebugSphere(GetWorld(), EndLocation, 5.f, 12, FColor::Blue, true);
+	DrawDebugLine(GetWorld(), TraceStart, TraceStart + ToEndLocation * TRACE_LENGTH / ToEndLocation.Size(), FColor::Green, true);
+	return FVector(TraceStart + ToEndLocation + TRACE_LENGTH / ToEndLocation.Size());
 }

@@ -11,9 +11,6 @@
 
 #include "CombatComponent.generated.h"
 
-
-#define TRACE_LENGTH 80000.f // define our trace length
-
 class ADFNCharacter;
 class ADFNPlayerController;
 class ADFNHUD;
@@ -146,18 +143,21 @@ private:
 	void OnRep_CarriedAmmo();
 
 	TMap<EWeaponType, int32> CarriedAmmoMap;
-	
-	UPROPERTY(EditAnywhere)
-	int32 StartingAssaultRifleAmmo = 0;
-
-	UPROPERTY(EditAnywhere)
-	int32 StartingRocketAmmo = 0;
 
 	UPROPERTY(EditAnywhere)
 	int32 StartingPistolAmmo = 0;
 	
 	UPROPERTY(EditAnywhere)
 	int32 StartingSMGAmmo = 0;
+
+	UPROPERTY(EditAnywhere)
+	int32 StartingShotGunAmmo = 0;
+	
+	UPROPERTY(EditAnywhere)
+	int32 StartingAssaultRifleAmmo = 0;
+
+	UPROPERTY(EditAnywhere)
+	int32 StartingRocketAmmo = 0;
 		
 	void InitializeCarriedAmmo();
 
