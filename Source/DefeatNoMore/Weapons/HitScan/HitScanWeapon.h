@@ -43,10 +43,10 @@ private:
 	/* Trace end With Spread */
 
 	UPROPERTY(EditAnywhere, Category = "Weapon Spread")
-	float DistanceToSphere = 800.f;
+	float ShotDistance = 800.f;
 
 	UPROPERTY(EditAnywhere, Category = "Weapon Spread")
-	float SphereRadius = 75.f;
+	float SpreadRadius = 75.f;
 
 	UPROPERTY(EditAnywhere, Category = "Weapon Spread")
 	bool bUseSpread = false;
@@ -55,4 +55,6 @@ private:
 protected:
 
 	FVector TraceSpread(const FVector& TraceStart, const FVector& HitTarget);
+
+	void WeaponTraceHit(const FVector& TraceStart, const FVector& HitTarget, FHitResult& OutHit);
 };
