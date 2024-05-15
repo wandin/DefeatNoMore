@@ -13,6 +13,7 @@
 #include "DefeatNoMore/HUD/DFNHUD.h"
 #include "TimerManager.h"
 
+#include "Components/InputComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 
 #include "DefeatNoMore/Enums/WeaponTypes.h"
@@ -279,8 +280,15 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 
 void UCombatComponent::SetAiming(bool bIsAiming)
 {
+	if(DFNCharacter == nullptr || EquippedWeapon == nullptr) return;
 	bAiming = bIsAiming;
 	ServerSetAiming(bIsAiming);
+	// Adjust Character Walk Speed when it's aiming
+
+	if(DFNCharacter->IsLocallyControlled() && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle)
+	{
+		DFNCharacter->ShowSniperScopeWidget(bIsAiming); // display sniper scope if aiming
+	}
 }
 
 void UCombatComponent::ServerSetAiming_Implementation(bool bIsAiming)

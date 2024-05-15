@@ -11,6 +11,8 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/Texture2D.h"
 
+#include "Sniper/SniperScope.h"
+
 void ADFNHUD::DrawHUD()
 {
 	Super::DrawHUD();

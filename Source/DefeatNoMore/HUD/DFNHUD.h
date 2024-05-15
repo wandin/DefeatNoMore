@@ -3,9 +3,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+#include "Blueprint/UserWidget.h"
+
 #include "GameFramework/HUD.h"
 #include "DFNHUD.generated.h"
 
+class UPlayerOverlayWidget;
+class UAnnouncement;
+class USniperScope;
 class UTexture2D;
 
 /*
@@ -41,7 +47,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Player Stats")
 	TSubclassOf<UUserWidget> PlayerOverlayClass;
 	UPROPERTY()
-	class UPlayerOverlayWidget* PlayerOverlay;
+	UPlayerOverlayWidget* PlayerOverlay;
 	void AddPlayerOverlay();
 	/* End of Player Overlay */
 
@@ -49,7 +55,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Player Stats")
 	TSubclassOf<UUserWidget> AnnoucementOverlayClass;
 	UPROPERTY()
-	class UAnnouncement* AnnouncementOverlay;
+	UAnnouncement* AnnouncementOverlay;
 	void AddAnnouncementOverlay();
 	/* End od Annoucement Overlay */
 

@@ -165,7 +165,7 @@ void ADFNCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 		//Equip
 		EIC->BindAction(EquipAction, ETriggerEvent::Triggered, this, &ADFNCharacter::EquipButtonPressed);
 		// Aim - ZoomFOV
-		EIC->BindAction(AimAction, ETriggerEvent::Triggered, this, &ADFNCharacter::AimButtonPressed);
+		EIC->BindAction(AimAction, ETriggerEvent::Started, this, &ADFNCharacter::AimButtonPressed);
 		EIC->BindAction(AimAction, ETriggerEvent::Completed, this, &ADFNCharacter::AimButtonReleased);
 		//Fire
 		EIC->BindAction(FireAction, ETriggerEvent::Started, this, &ADFNCharacter::FireButtonPressed);
@@ -616,6 +616,12 @@ void ADFNCharacter::MulticastElimination_Implementation()
 	}
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	bool bHideScope = IsLocallyControlled() && CombatComp && CombatComp->bAiming && CombatComp->EquippedWeapon && CombatComp->EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle;
+	if(bHideScope)
+	{
+		ShowSniperScopeWidget(false);
+	}
 }
 
 void ADFNCharacter::PlayEliminationMontage()
