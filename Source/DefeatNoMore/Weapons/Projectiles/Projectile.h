@@ -21,11 +21,15 @@ class DEFEATNOMORE_API AProjectile : public AActor
 public:	
 	AProjectile();
 	virtual void Tick(float DeltaTime) override;
-
 	virtual void Destroyed() override; 
 
 protected:
 	virtual void BeginPlay() override;
+
+	void StartDestroyTimer();
+	void DestroyTimerFinished();
+
+	void ExplodeDamage(float InnerRadius, float OuterRadius, float DamageFallOff);
 
 	/**
 	 * @brief - Projectile Hit Event
@@ -40,21 +44,33 @@ protected:
 
 	UPROPERTY(EditAnywhere)
 	float Damage = 30.f;
-private:
+
+	// impact FX's to be spawned when projectile hits something.
+	UPROPERTY(EditAnywhere)
+	UParticleSystem* ImpactParticles;
+	
+	UPROPERTY(EditAnywhere)
+	USoundCue* ImpactSound;
 
 	// Projectile CollisionBox and ProjectileMovementComponent, set in blueprints.
 	UPROPERTY(EditAnywhere)
 	UBoxComponent* CollisionBox;
+
 	UPROPERTY(VisibleAnywhere)
 	UProjectileMovementComponent* ProjectileMovementComponent;
+	
+	UPROPERTY(VisibleAnywhere)
+	UStaticMeshComponent* ProjectileMesh;
+	
+private:
 	// Tracer and component, to be spawned
 	UPROPERTY(EditAnywhere)
 	UParticleSystem* Tracer;
 	UPROPERTY()
 	UParticleSystemComponent* TracerComponent;
-	// impact FX's to be spawned when projectile hits something.
+
+	FTimerHandle DestroyTimer;
+
 	UPROPERTY(EditAnywhere)
-	UParticleSystem* ImpactParticles;
-	UPROPERTY(EditAnywhere)
-	USoundCue* ImpactSound;
+	float DestroyTime = 3.f;
 };

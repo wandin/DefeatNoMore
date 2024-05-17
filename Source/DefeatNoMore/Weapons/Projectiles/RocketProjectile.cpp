@@ -3,43 +3,30 @@
 
 #include "RocketProjectile.h"
 
+#include "DFNProjectileMovementComponent.h"
+
 #include "Components/StaticMeshComponent.h"
 
 #include "GameFramework/DamageType.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 
 #include "Kismet/GameplayStatics.h"
 
 ARocketProjectile::ARocketProjectile()
 {
-	RocketMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RocketMesh"));
-	RocketMesh->SetupAttachment(RootComponent);
-	RocketMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RocketMesh"));
+	ProjectileMesh->SetupAttachment(RootComponent);
+	ProjectileMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	RocketProjectileMovementComponent = CreateDefaultSubobject<UDFNProjectileMovementComponent>(TEXT("RocketMovementComponent"));
+	RocketProjectileMovementComponent->bRotationFollowsVelocity = true;
+	RocketProjectileMovementComponent->SetIsReplicated(true);
 }
 
 void ARocketProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
                               FVector NormalImpulse, const FHitResult& Hit)
 {
-
-	APawn* FiringPawn =  GetInstigator();
-	if(FiringPawn)
-	{
-		AController* FiringController = FiringPawn->GetController();
-		if(FiringController)
-		{
-			UGameplayStatics::ApplyRadialDamageWithFalloff(
-				this,
-				Damage,
-				10.f,
-				GetActorLocation(),
-				InnerRadius,
-				OuterRadius,
-				DamageFallOff,
-				UDamageType::StaticClass(), // <-- damage type
-				TArray<AActor*>(),
-				this,
-				FiringController); // <-- instigatorController
-		}
-	}
+	ExplodeDamage(InnerRadius, OuterRadius, DamageFallOff);
 	Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit);
 }

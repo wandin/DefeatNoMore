@@ -3,12 +3,15 @@
 
 #include "Projectile.h"
 
+#include "TimerManager.h"
+
 #include "Components/BoxComponent.h"
-#include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
 #include "DefeatNoMore/DefeatNoMore.h"
-#include "DefeatNoMore/Character/DFNCharacter.h"
+
+#include "GameFramework/DamageType.h"
+#include "GameFramework/Pawn.h"
 
 AProjectile::AProjectile()
 {
@@ -16,20 +19,15 @@ AProjectile::AProjectile()
 
 	bReplicates = true;	
 	
-	// Collision Box
+	// Collision Boxs	
 	CollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBox"));
 	SetRootComponent(CollisionBox);
-	CollisionBox->SetCollisionObjectType(ECC_WorldDynamic);
+	CollisionBox->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
 	CollisionBox->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	CollisionBox->SetCollisionResponseToAllChannels(ECR_Ignore);
-	CollisionBox->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-	CollisionBox->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
-	CollisionBox->SetCollisionResponseToChannel(ECC_SkeletalMesh, ECR_Block);
-
-
-	ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComponent"));
-	ProjectileMovementComponent->bRotationFollowsVelocity = true;
-
+	CollisionBox->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	CollisionBox->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
+	CollisionBox->SetCollisionResponseToChannel(ECollisionChannel::ECC_WorldStatic, ECollisionResponse::ECR_Block);
+	CollisionBox->SetCollisionResponseToChannel(ECC_SkeletalMesh, ECollisionResponse::ECR_Block);
 }
 
 void AProjectile::BeginPlay()
@@ -47,11 +45,44 @@ void AProjectile::BeginPlay()
 			EAttachLocation::KeepWorldPosition
 		);
 	}
-
 	// binding our OnHit Delegates
 	if(HasAuthority())
 	{
 		CollisionBox->OnComponentHit.AddDynamic(this, &AProjectile::OnHit);
+	}
+}
+
+void AProjectile::StartDestroyTimer()
+{
+	GetWorldTimerManager().SetTimer(DestroyTimer, this, &AProjectile::DestroyTimerFinished, DestroyTime);
+}
+
+void AProjectile::DestroyTimerFinished()
+{
+	Destroy();
+}
+
+void AProjectile::ExplodeDamage(float InnerRadius, float OuterRadius, float DamageFallOff)
+{
+	APawn* FiringPawn =  GetInstigator();
+	if(FiringPawn && HasAuthority())
+	{
+		AController* FiringController = FiringPawn->GetController();
+		if(FiringController)
+		{
+			UGameplayStatics::ApplyRadialDamageWithFalloff(
+				this,
+				Damage,
+				10.f,
+				GetActorLocation(),
+				InnerRadius,
+				OuterRadius,
+				DamageFallOff,
+				UDamageType::StaticClass(), // <-- damage type
+				TArray<AActor*>(),
+				this,
+				FiringController); // <-- instigatorController
+		}
 	}
 }
 

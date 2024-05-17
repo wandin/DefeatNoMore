@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "DFNProjectileMovementComponent.h"
+
 #include "DefeatNoMore/Weapons/Projectiles/Projectile.h"
 #include "RocketProjectile.generated.h"
 
@@ -19,8 +21,7 @@ public:
 	ARocketProjectile();
 	
 protected:
-
-
+	
 	/**
 	 * @brief - Projectile Hit Event
 	 * @param HitComp - Component that causes the hit (our projectile)
@@ -41,9 +42,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	float DamageFallOff = 1.f;
 
-
-private:
-
 	UPROPERTY(VisibleAnywhere)
-	UStaticMeshComponent* RocketMesh;
+	UDFNProjectileMovementComponent* RocketProjectileMovementComponent;
 };

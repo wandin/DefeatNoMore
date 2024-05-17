@@ -524,19 +524,22 @@ void ADFNCharacter::PlayReloadMontage() const
 		switch (CombatComp->EquippedWeapon->GetWeaponType())
 		{
 		case EWeaponType::EWT_Pistol:
-			SectionName = FName("Rifle");
+			SectionName = FName("Pistol");
 			break;
 		case EWeaponType::EWT_SMG:
-			SectionName = FName("Rifle");
+			SectionName = FName("SubMachinegun");
 			break;
 		case EWeaponType::EWT_AssaultRifle:
 			SectionName = FName("Rifle");
 			break;
 		case EWeaponType::EWT_SniperRifle:
-			SectionName = FName("Rifle");
+			SectionName = FName("-");
 			break;
 		case EWeaponType::EWT_RocketLauncher:
-			SectionName = FName("Rifle");
+			SectionName = FName("RocketLauncher");
+			break;
+		case EWeaponType::EWT_GrenadeLauncher:
+			SectionName = FName("-");
 			break;
 		default: ;
 		}
