@@ -5,6 +5,7 @@
 #include "TimerManager.h"
 
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimSequenceHelpers.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -24,6 +25,8 @@
 
 #include "Materials/MaterialInstanceDynamic.h"
 
+#include "PhysicsEngine/PhysicsAsset.h"
+
 ADFNCharacter::ADFNCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -37,6 +40,13 @@ ADFNCharacter::ADFNCharacter()
 	ThirdPersonCamera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
 	ThirdPersonCamera->SetRelativeRotation(FRotator(0.f, 340.f, 0.f));
 	ThirdPersonCamera->bUsePawnControlRotation = false;
+	ThirdPersonCamera->SetAutoActivate(true);
+
+	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
+	FirstPersonCamera->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("head"));
+	FirstPersonCamera->bUsePawnControlRotation = true;
+	FirstPersonCamera->SetRelativeLocationAndRotation(FVector(5.f, 5.f, 0.0f), FRotator(-90.f, 0.0f, 90.f));
+	ThirdPersonCamera->SetAutoActivate(true);
 	
 	//CombatComponent
 	CombatComp = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
@@ -51,8 +61,8 @@ ADFNCharacter::ADFNCharacter()
 	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	
-	NetUpdateFrequency = 128.f;
-	MinNetUpdateFrequency = 64.f;
+	NetUpdateFrequency = 66.f;
+	MinNetUpdateFrequency = 33.f;
 
 	DissolveTimeLine = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimeLineComponent"));
 }
@@ -172,6 +182,8 @@ void ADFNCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 		EIC->BindAction(FireAction, ETriggerEvent::Completed, this, &ADFNCharacter::FireButtonReleased);
 		//Reload
 		EIC->BindAction(ReloadAction, ETriggerEvent::Started, this, &ADFNCharacter::ReloadButtonPressed);
+		//Toggle camera
+		EIC->BindAction(ToggleCameraAction, ETriggerEvent::Started, this, &ADFNCharacter::ToggleCameraButtonPressed);
 	}
 }
 
@@ -288,6 +300,25 @@ void ADFNCharacter::ReloadButtonPressed()
 	}
 }
 
+void ADFNCharacter::ToggleCameraButtonPressed()
+{
+	if(GetMesh() && ThirdPersonCamera && FirstPersonCamera)
+	{
+		if(ThirdPersonCamera->IsActive())
+		{
+			ThirdPersonCamera->Deactivate();
+			FirstPersonCamera->SetActive(true);
+			GetMesh()->HideBoneByName(TEXT("head"), EPhysBodyOp::PBO_None);
+		}
+		else if (FirstPersonCamera->IsActive())
+		{
+			FirstPersonCamera->Deactivate();
+			ThirdPersonCamera->SetActive(true);
+			GetMesh()->UnHideBoneByName(TEXT("head"));
+		}
+	}
+}
+
 float ADFNCharacter::CalculateSpeed() const
 {
 	FVector Velocity = GetVelocity();
@@ -304,15 +335,15 @@ void ADFNCharacter::OnRep_Health()
 void ADFNCharacter::AimOffset(float DeltaSeconds)
 {
 	if (CombatComp && CombatComp->EquippedWeapon == nullptr) return;
-	const float Speed = CalculateSpeed();
-	const bool bIsInAir = GetCharacterMovement()->IsFalling();
+	float Speed = CalculateSpeed();
+	bool bIsInAir = GetCharacterMovement()->IsFalling();
 	
 	//	Yaw
-	if(Speed > 0.f && !bIsInAir)
+	if(Speed == 0.f && !bIsInAir)	// standing still, not jumping
 	{
 		bRotateRootBone = true;
-		const FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
-		const FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StartingAimRotation);
+		FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
+		FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StartingAimRotation);
 		AO_Yaw = DeltaAimRotation.Yaw;
 		if (TurningInPlace == ETurnInPlace::ETIP_NotTurning)
 		{
@@ -329,7 +360,6 @@ void ADFNCharacter::AimOffset(float DeltaSeconds)
 		bUseControllerRotationYaw = true;
 		TurningInPlace = ETurnInPlace::ETIP_NotTurning;
 	}
-	TurnInPlace(DeltaSeconds);
 	// Pitch
 	CalculateAO_Pitch();
 }
@@ -339,21 +369,20 @@ void ADFNCharacter::CalculateAO_Pitch()
 	AO_Pitch = GetBaseAimRotation().Pitch;
 	if(AO_Pitch > 90.f && !IsLocallyControlled())
 	{
-		const FVector2d InRange(270.f, 360.f);
-		const FVector2d OutRange(-90.f, 0.f);
+		// map pitch from [270, 360] to [-90, 0]
+		FVector2d InRange(270.f, 360.f);
+		FVector2d OutRange(-90.f, 0.f);
 		AO_Pitch = FMath::GetMappedRangeValueClamped(InRange, OutRange, AO_Pitch);
 	}
 }
 
 void ADFNCharacter::SimProxiesTurn()
 {
-	if(CombatComp == nullptr || CombatComp->EquippedWeapon == nullptr) return;
-	
-	const float Speed = CalculateSpeed();
+	if(CombatComp && CombatComp->EquippedWeapon == nullptr) return;
+	bRotateRootBone = false;
+	float Speed = CalculateSpeed();
 	if(Speed > 0.f)
 	{
-		bRotateRootBone = false;
-		AO_Yaw = 0.f;
 		TurningInPlace = ETurnInPlace::ETIP_NotTurning;
 		return;
 	}
@@ -379,7 +408,6 @@ void ADFNCharacter::SimProxiesTurn()
 		return;
 	}
 	TurningInPlace = ETurnInPlace::ETIP_NotTurning;
-
 }
 
 void ADFNCharacter::OnRep_ReplicatedMovement()
@@ -411,19 +439,19 @@ void ADFNCharacter::ServerEquipWeaponOnCombatComponent()
 
 void ADFNCharacter::TurnInPlace(float DeltaSeconds)
 {
-	if (AO_Yaw > 90.f)
+	if (AO_Yaw > 45.f)	// 45 degrees positive turn right
 	{
 		TurningInPlace = ETurnInPlace::ETIP_Right;
 	}
-	else if (AO_Yaw < -90.f)
+	else if (AO_Yaw < -45.f) // 45 degrees negative turn left
 	{
 		TurningInPlace = ETurnInPlace::ETIP_Left;
 	}
 	if (TurningInPlace != ETurnInPlace::ETIP_NotTurning)
 	{
-		InterpAO_Yaw = FMath::FInterpTo(InterpAO_Yaw, 0.f, DeltaSeconds, 3.f);
+		InterpAO_Yaw = FMath::FInterpTo(InterpAO_Yaw, 0.f, DeltaSeconds, 4.f);
 		AO_Yaw = InterpAO_Yaw;
-		if (AO_Yaw < 15.f)
+		if (FMath::Abs(AO_Yaw) < 15.f)
 		{
 			TurningInPlace = ETurnInPlace::ETIP_NotTurning;
 			StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);

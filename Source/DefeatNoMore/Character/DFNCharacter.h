@@ -12,6 +12,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "DefeatNoMore/Enums/TurnInPlace.h"
 #include "DefeatNoMore/Interfaces/InterfaceCrosshairInteraction.h"
+
 #include "DFNCharacter.generated.h"
 
 class AWeapon;
@@ -79,6 +80,7 @@ protected:
 	void FireButtonPressed();	// calll FireButtonPressed on CombatComponent, responsible for handling all combat actions 
 	void FireButtonReleased();
 	void ReloadButtonPressed();
+	void ToggleCameraButtonPressed();
 
 	// calls ServerWalkPressed, which set variables that are already replicated on CharacterMovementComponent.
 	UFUNCTION(Server, Unreliable)
@@ -118,6 +120,8 @@ private:
 
 	/** Actions */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
+	UInputAction* ToggleCameraAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	UInputAction* JumpAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
 	UInputAction* MoveAction;
@@ -143,6 +147,8 @@ private:
 	USpringArmComponent* SpringArm;
 	UPROPERTY(EditDefaultsOnly, Category = Camera)
 	UCameraComponent* ThirdPersonCamera;
+	UPROPERTY(EditDefaultsOnly, Category = Camera)
+	UCameraComponent* FirstPersonCamera;
 	
 	// CombatComponent, handles all of ours combat actions
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
@@ -259,6 +265,7 @@ public:
 
 	FORCEINLINE ETurnInPlace GetTurnInPlace() const { return TurningInPlace; }
 	FORCEINLINE UCameraComponent* GetThirdPersonCamera() const { return ThirdPersonCamera; }
+	FORCEINLINE UCameraComponent* GetFirstPersonCamera() const { return FirstPersonCamera; }
 	FORCEINLINE UCombatComponent* GetCombatComponent() const { return CombatComp; }
 
 	FORCEINLINE bool GetDisableGameplay() { return bDisableGameplay; }
