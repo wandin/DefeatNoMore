@@ -261,6 +261,18 @@ void ADFNPlayerController::SetHUDWarmupCountDown(float WarmupCountDownTime)
 	}
 }
 
+void ADFNPlayerController::SetHUDCameraMode(FText CameraModeText)
+{
+	GameHUD = GameHUD == nullptr ? Cast<ADFNHUD>(GetHUD()) : GameHUD;
+	bool bHUDValid = GameHUD &&
+		GameHUD->PlayerOverlay &&
+		GameHUD->PlayerOverlay->CameraModeText;
+	if (bHUDValid)
+	{
+		GameHUD->PlayerOverlay->CameraModeText->SetText(CameraModeText);
+	}
+}
+
 void ADFNPlayerController::SetHUDTime()
 {
 	float TimeLeft = 0.f;

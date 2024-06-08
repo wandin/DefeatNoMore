@@ -25,6 +25,7 @@ public:
 	void UpdateHUDWeaponImage(UTexture2D* WeaponImage);
 	void SetHUDMatchCountDown(float MatchCountDownTime);
 	void SetHUDWarmupCountDown(float WarmupCountDownTime);
+	void SetHUDCameraMode(FText CameraModeText);
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void OnPossess(APawn* InPawn) override;

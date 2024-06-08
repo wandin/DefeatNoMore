@@ -43,9 +43,9 @@ ADFNCharacter::ADFNCharacter()
 	ThirdPersonCamera->SetAutoActivate(true);
 
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	FirstPersonCamera->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("head"));
+	FirstPersonCamera->SetupAttachment(GetMesh(), TEXT("head"));
 	FirstPersonCamera->bUsePawnControlRotation = true;
-	FirstPersonCamera->SetRelativeLocationAndRotation(FVector(5.f, 5.f, 0.0f), FRotator(-90.f, 0.0f, 90.f));
+	FirstPersonCamera->SetRelativeLocationAndRotation(FVector(6.f, 10.f, 0.0f), FRotator(-90.f, 0.0f, 90.f));
 	ThirdPersonCamera->SetAutoActivate(true);
 	
 	//CombatComponent
@@ -65,6 +65,7 @@ ADFNCharacter::ADFNCharacter()
 	MinNetUpdateFrequency = 33.f;
 
 	DissolveTimeLine = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimeLineComponent"));
+	CameraMode = ECameraMode::ECM_ThirdPerson;
 }
 
 void ADFNCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -121,6 +122,7 @@ void ADFNCharacter::BeginPlay()
 		OnTakeAnyDamage.AddDynamic(this, &ADFNCharacter::ReceiveDamage);
 	}
 	UpdateHUDHealth();
+	UpdateCameraModeHUD();
 }
 
 void ADFNCharacter::Tick(float DeltaSeconds)
@@ -232,7 +234,10 @@ void ADFNCharacter::CrouchPressed()
 	{
 		UnCrouch();
 	}
-	Crouch();
+	else if(!bIsCrouched)
+	{
+		Crouch();
+	}
 }
 
 void ADFNCharacter::WalkPressed()
@@ -301,20 +306,53 @@ void ADFNCharacter::ReloadButtonPressed()
 }
 
 void ADFNCharacter::ToggleCameraButtonPressed()
-{
-	if(GetMesh() && ThirdPersonCamera && FirstPersonCamera)
+{	
+	if(CameraMode == ECameraMode::ECM_ThirdPerson)
 	{
-		if(ThirdPersonCamera->IsActive())
+		UpdateCameraView(CameraMode);
+	}
+	else if (CameraMode == ECameraMode::ECM_FirstPerson)
+	{
+		UpdateCameraView(CameraMode);
+	}
+}
+
+void ADFNCharacter::UpdateCameraView(ECameraMode CameraView)
+{
+	if(!ThirdPersonCamera && !FirstPersonCamera && !DFNPlayerController) return;	
+	if(CameraView == ECameraMode::ECM_ThirdPerson)
+	{
+		ThirdPersonCamera->SetActive(false);
+		FirstPersonCamera->SetActive(true);
+		GetMesh()->HideBoneByName(TEXT("head"), EPhysBodyOp::PBO_None);
+		CameraView = ECameraMode::ECM_FirstPerson;
+	}
+	else if (CameraView == ECameraMode::ECM_FirstPerson)
+	{
+		FirstPersonCamera->SetActive(false);
+		ThirdPersonCamera->SetActive(true);
+		GetMesh()->UnHideBoneByName(TEXT("head"));
+		CameraView = ECameraMode::ECM_ThirdPerson;
+	}
+	CameraMode = CameraView;
+	UpdateCameraModeHUD();
+}
+
+void ADFNCharacter::UpdateCameraModeHUD()
+{
+	DFNPlayerController = DFNPlayerController == nullptr ? Cast<ADFNPlayerController>(Controller) : DFNPlayerController;
+	if(DFNPlayerController)
+	{
+		FText CameraModeText;
+		if(CameraMode == ECameraMode::ECM_FirstPerson)
 		{
-			ThirdPersonCamera->Deactivate();
-			FirstPersonCamera->SetActive(true);
-			GetMesh()->HideBoneByName(TEXT("head"), EPhysBodyOp::PBO_None);
+			CameraModeText = FText::FromString("FPS");
+			DFNPlayerController->SetHUDCameraMode(CameraModeText);
 		}
-		else if (FirstPersonCamera->IsActive())
+		if(CameraMode == ECameraMode::ECM_ThirdPerson)
 		{
-			FirstPersonCamera->Deactivate();
-			ThirdPersonCamera->SetActive(true);
-			GetMesh()->UnHideBoneByName(TEXT("head"));
+			CameraModeText = FText::FromString("TPS");
+			DFNPlayerController->SetHUDCameraMode(CameraModeText);
 		}
 	}
 }

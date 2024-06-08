@@ -1,5 +1,5 @@
 ﻿#pragma once
-
+/*
 UENUM(BlueprintType)
 enum class ECombatState : uint8
 {
@@ -7,4 +7,4 @@ enum class ECombatState : uint8
 	ECS_Reloading UMETA(DisplayName = "Reloading"),
 
 	ECS_MAX UMETA(DisplayName = "DefaultMAX")
-};
+};*/

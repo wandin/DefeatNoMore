@@ -10,7 +10,7 @@
 #include "DefeatNoMore/Enums/CombatState.h"
 
 #include "GameFramework/SpringArmComponent.h"
-#include "DefeatNoMore/Enums/TurnInPlace.h"
+#include "DefeatNoMore/Enums/GameplayEnums.h"
 #include "DefeatNoMore/Interfaces/InterfaceCrosshairInteraction.h"
 
 #include "DFNCharacter.generated.h"
@@ -110,6 +110,11 @@ protected:
 	// Poll for any relelvant classes and initialize our HUD
 	void PollInit();
 	void RotateInPlace(float DeltaSeconds);
+
+	ECameraMode CameraMode;
+	void UpdateCameraView(ECameraMode CameraView);
+	void UpdateCameraModeHUD();
+	
 	
 private:
 

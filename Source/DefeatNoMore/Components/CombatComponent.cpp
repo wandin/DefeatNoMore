@@ -16,7 +16,7 @@
 #include "Components/InputComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 
-#include "DefeatNoMore/Enums/WeaponTypes.h"
+#include "DefeatNoMore/Enums/GameplayEnums.h"
 
 #include "Engine/GameViewportClient.h"
 

@@ -6,7 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "DefeatNoMore/HUD/DFNHUD.h"
 #include "DefeatNoMore/Enums/WeaponTypes.h"
-#include "DefeatNoMore/Enums/CombatState.h"
+#include "DefeatNoMore/Enums/GameplayEnums.h"
 
 
 #include "CombatComponent.generated.h"

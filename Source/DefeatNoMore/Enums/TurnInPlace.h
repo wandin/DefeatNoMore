@@ -3,7 +3,7 @@
 /**
  * @brief our turn in place states, in order to play TurnInPlace animations in ABP_DFNCharacter
  */
-UENUM(BlueprintType)
+/*UENUM(BlueprintType)
 enum class ETurnInPlace : uint8
 {
 	ETIP_Left			UMETA(DisplayName = "TurnLeft"),
@@ -12,3 +12,4 @@ enum class ETurnInPlace : uint8
 
 	ETIP_Max 			UMETA(DisplayName = "DefaultMax")
 };
+*/
